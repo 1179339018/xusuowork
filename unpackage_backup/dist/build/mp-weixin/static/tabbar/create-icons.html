@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>TabBar图标生成</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        h1 { color: #1677ff; }
+        .icon-item { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        canvas { border: 1px solid #ccc; display: block; margin: 10px 0; }
+        button { background: #1677ff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #4096ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 TabBar 图标生成工具</h1>
+        <p>点击按钮下载PNG图标，保存到 <code>static/tabbar/</code> 目录</p>
+        
+        <div id="icons"></div>
+    </div>
+
+    <script>
+        const icons = [
+            { name: 'home', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L2 12H5V20H19V12H22L12 3Z"/></svg>', color: '#94a3b8' },
+            { name: 'home-active', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L2 12H5V20H19V12H22L12 3Z"/></svg>', color: '#1677ff' },
+            { name: 'task', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H14.82C14.4 1.84 13.3 1 12 1C10.7 1 9.6 1.84 9.18 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM12 3C12.55 3 13 3.45 13 4C13 4.55 12.55 5 12 5C11.45 5 11 4.55 11 4C11 3.45 11.45 3 12 3ZM14 17H7V15H14V17ZM17 13H7V11H17V13ZM17 9H7V7H17V9Z"/></svg>', color: '#94a3b8' },
+            { name: 'task-active', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H14.82C14.4 1.84 13.3 1 12 1C10.7 1 9.6 1.84 9.18 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM12 3C12.55 3 13 3.45 13 4C13 4.55 12.55 5 12 5C11.45 5 11 4.55 11 4C11 3.45 11.45 3 12 3ZM14 17H7V15H14V17ZM17 13H7V11H17V13ZM17 9H7V7H17V9Z"/></svg>', color: '#1677ff' },
+            { name: 'add', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM17 13H13V17H11V13H7V11H11V7H13V11H17V13Z"/></svg>', color: '#94a3b8' },
+            { name: 'add-active', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM17 13H13V17H11V13H7V11H11V7H13V11H17V13Z"/></svg>', color: '#1677ff' },
+            { name: 'street', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM11 11H7V7H11V11ZM17 11H13V7H17V11ZM11 17H7V13H11V17ZM17 17H13V13H17V17Z"/></svg>', color: '#94a3b8' },
+            { name: 'street-active', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM11 11H7V7H11V11ZM17 11H13V7H17V11ZM11 17H7V13H11V17ZM17 17H13V13H17V17Z"/></svg>', color: '#1677ff' },
+            { name: 'mine', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"/></svg>', color: '#94a3b8' },
+            { name: 'mine-active', svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"/></svg>', color: '#1677ff' }
+        ];
+
+        function createIcon(icon) {
+            const div = document.createElement('div');
+            div.className = 'icon-item';
+            div.innerHTML = `
+                <h3>${icon.name}</h3>
+                <canvas id="canvas-${icon.name}" width="81" height="81"></canvas>
+                <button onclick="download('${icon.name}', '${icon.color}')">下载 ${icon.name}.png</button>
+            `;
+            document.getElementById('icons').appendChild(div);
+            
+            // 绘制图标
+            setTimeout(() => {
+                drawIcon(icon.name, icon.svg, icon.color);
+            }, 100);
+        }
+
+        function drawIcon(name, svgStr, color) {
+            const canvas = document.getElementById(`canvas-${name}`);
+            const ctx = canvas.getContext('2d');
+            
+            // 创建SVG图像
+            const img = new Image();
+            const svgBlob = new Blob([svgStr.replace(/fill="#[^"]*"/g, `fill="${color}"`)], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(svgBlob);
+            
+            img.onload = function() {
+                ctx.clearRect(0, 0, 81, 81);
+                ctx.drawImage(img, 0, 0, 81, 81);
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+
+        function download(name, color) {
+            const canvas = document.getElementById(`canvas-${name}`);
+            const icon = icons.find(i => i.name === name);
+            
+            // 重新绘制以确保颜色正确
+            drawIcon(name, icon.svg, color);
+            
+            setTimeout(() => {
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = name + '.png';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            }, 200);
+        }
+
+        // 初始化
+        icons.forEach(icon => createIcon(icon));
+    </script>
+</body>
+</html>

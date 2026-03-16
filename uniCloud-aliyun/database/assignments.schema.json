@@ -1,0 +1,37 @@
+{
+	"bsonType": "object",
+	"required": ["dispute_id", "community_id"],
+	"properties": {
+		"_id": {
+			"description": "ID，系统自动生成"
+		},
+		"dispute_id": {
+			"bsonType": "string",
+			"description": "纠纷ID",
+			"label": "纠纷ID"
+		},
+		"community_id": {
+			"bsonType": "string",
+			"description": "社区ID",
+			"label": "社区ID"
+		},
+		"assign_time": {
+			"bsonType": "timestamp",
+			"description": "分派时间",
+			"label": "分派时间",
+			"forceDefaultValue": {
+				"$env": "now"
+			}
+		},
+		"assign_user": {
+			"bsonType": "string",
+			"description": "分派人openid",
+			"label": "分派人"
+		},
+		"remark": {
+			"bsonType": "string",
+			"description": "分派备注",
+			"label": "备注"
+		}
+	}
+}

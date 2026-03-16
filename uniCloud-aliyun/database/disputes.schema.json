@@ -1,0 +1,91 @@
+{
+	"bsonType": "object",
+	"required": ["source", "title", "status"],
+	"properties": {
+		"_id": {
+			"description": "ID，系统自动生成"
+		},
+		"source": {
+			"bsonType": "string",
+			"description": "纠纷来源",
+			"enum": ["接处警", "社区摸排", "工作发现"],
+			"label": "纠纷来源"
+		},
+		"title": {
+			"bsonType": "string",
+			"description": "纠纷标题",
+			"label": "标题",
+			"maxLength": 100
+		},
+		"description": {
+			"bsonType": "string",
+			"description": "纠纷描述",
+			"label": "描述"
+		},
+		"location": {
+			"bsonType": "object",
+			"description": "位置信息",
+			"properties": {
+				"address": {
+					"bsonType": "string",
+					"description": "地址"
+				},
+				"latitude": {
+					"bsonType": "double",
+					"description": "纬度"
+				},
+				"longitude": {
+					"bsonType": "double",
+					"description": "经度"
+				}
+			}
+		},
+		"parties": {
+			"bsonType": "string",
+			"description": "涉及人员",
+			"label": "涉及人员"
+		},
+		"urgency": {
+			"bsonType": "string",
+			"description": "紧急度",
+			"enum": ["一般", "紧急", "特急"],
+			"label": "紧急度"
+		},
+		"status": {
+			"bsonType": "string",
+			"description": "状态",
+			"enum": ["待分派", "待回访", "处理中", "已化解", "已关闭"],
+			"label": "状态",
+			"default": "待分派"
+		},
+		"occur_count": {
+			"bsonType": "int",
+			"description": "发生次数",
+			"label": "发生次数",
+			"default": 1
+		},
+		"create_time": {
+			"bsonType": "timestamp",
+			"description": "创建时间",
+			"label": "创建时间",
+			"forceDefaultValue": {
+				"$env": "now"
+			}
+		},
+		"create_user": {
+			"bsonType": "string",
+			"description": "创建人openid",
+			"label": "创建人"
+		},
+		"assign_community": {
+			"bsonType": "string",
+			"description": "分派的社区ID",
+			"label": "分派社区"
+		},
+		"assign_time": {
+			"bsonType": "timestamp",
+			"description": "分派时间",
+			"label": "分派时间"
+		}
+	}
+}

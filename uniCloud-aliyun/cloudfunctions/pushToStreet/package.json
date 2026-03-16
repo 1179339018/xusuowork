@@ -1,0 +1,7 @@
+{
+	"name": "pushToStreet",
+	"version": "1.0.0",
+	"description": "推送纠纷到街道",
+	"main": "index.js",
+	"dependencies": {}
+}

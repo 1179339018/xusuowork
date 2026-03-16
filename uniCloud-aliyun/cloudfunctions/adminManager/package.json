@@ -1,0 +1,6 @@
+{
+  "name": "adminManager",
+  "version": "1.0.0",
+  "description": "管理员功能",
+  "main": "index.js"
+}

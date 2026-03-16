@@ -1,0 +1,25 @@
+# 依赖
+node_modules/
+unpackage/
+
+# 日志
+*.log
+npm-debug.log*
+
+# 编辑器
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 微信小程序
+project.config.json
+project.private.config.json
+
+# uniCloud
+.unicloud/
+
+# 临时文件
+*.tmp
+*.temp

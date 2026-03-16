@@ -1,0 +1,120 @@
+{
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^u-(.*)": "uview-plus/components/u-$1/u-$1.vue"
+		}
+	},
+	"pages": [
+		{
+			"path": "pages/splash/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "dark"
+			}
+		},
+		{
+			"path": "pages/input/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/street/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/community/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/detail/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/login/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/mine/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/admin/user-list",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "矛盾纠纷管理系统",
+		"navigationBarBackgroundColor": "#1677ff",
+		"backgroundColor": "#f5f5f5"
+	},
+	"tabBar": {
+		"color": "#7A7E83",
+		"selectedColor": "#1677ff",
+		"borderStyle": "black",
+		"backgroundColor": "#ffffff",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"iconPath": "static/tabbar/home.png",
+				"selectedIconPath": "static/tabbar/home-active.png",
+				"text": "首页"
+			},
+			{
+				"pagePath": "pages/community/index",
+				"iconPath": "static/tabbar/task.png",
+				"selectedIconPath": "static/tabbar/task-active.png",
+				"text": "我的任务"
+			},
+			{
+				"pagePath": "pages/input/index",
+				"iconPath": "static/tabbar/add.png",
+				"selectedIconPath": "static/tabbar/add-active.png",
+				"text": "录入"
+			},
+			{
+				"pagePath": "pages/street/index",
+				"iconPath": "static/tabbar/street.png",
+				"selectedIconPath": "static/tabbar/street-active.png",
+				"text": "街道"
+			},
+			{
+				"pagePath": "pages/mine/index",
+				"iconPath": "static/tabbar/mine.png",
+				"selectedIconPath": "static/tabbar/mine-active.png",
+				"text": "我的"
+			}
+		]
+	},
+	"condition": {
+		"current": 0,
+		"list": [
+			{
+				"name": "首页",
+				"path": "pages/index/index",
+				"query": ""
+			}
+		]
+	}
+}

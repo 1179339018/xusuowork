@@ -1,0 +1,38 @@
+{
+	"bsonType": "object",
+	"required": ["openid", "role"],
+	"properties": {
+		"_id": {
+			"description": "ID，系统自动生成"
+		},
+		"openid": {
+			"bsonType": "string",
+			"description": "微信openid",
+			"label": "OpenID"
+		},
+		"role": {
+			"bsonType": "string",
+			"description": "角色",
+			"enum": ["派出所", "街道", "社区"],
+			"label": "角色"
+		},
+		"name": {
+			"bsonType": "string",
+			"description": "姓名",
+			"label": "姓名"
+		},
+		"community": {
+			"bsonType": "string",
+			"description": "社区ID（仅社区角色）",
+			"label": "社区ID"
+		},
+		"create_time": {
+			"bsonType": "timestamp",
+			"description": "创建时间",
+			"label": "创建时间",
+			"forceDefaultValue": {
+				"$env": "now"
+			}
+		}
+	}
+}

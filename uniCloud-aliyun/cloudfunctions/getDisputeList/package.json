@@ -1,0 +1,7 @@
+{
+	"name": "getDisputeList",
+	"version": "1.0.0",
+	"description": "获取纠纷列表",
+	"main": "index.js",
+	"dependencies": {}
+}

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TabBar 图标生成器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1677ff;
+            margin-bottom: 30px;
+        }
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .icon-item {
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .icon-item h3 {
+            margin: 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            background: white;
+        }
+        button {
+            background: #1677ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #4096ff;
+        }
+        .instructions {
+            background: #e6f2ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .instructions h2 {
+            color: #1677ff;
+            margin-top: 0;
+        }
+        .instructions ol {
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 TabBar 图标生成器</h1>
+        
+        <div class="icon-grid">
+            <div class="icon-item">
+                <h3>首页 - 未选中</h3>
+                <canvas id="home" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('home', '#94a3b8')">下载 home.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>首页 - 选中</h3>
+                <canvas id="home-active" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('home-active', '#1677ff')">下载 home-active.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>任务 - 未选中</h3>
+                <canvas id="task" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('task', '#94a3b8')">下载 task.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>任务 - 选中</h3>
+                <canvas id="task-active" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('task-active', '#1677ff')">下载 task-active.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>录入 - 未选中</h3>
+                <canvas id="add" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('add', '#94a3b8')">下载 add.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>录入 - 选中</h3>
+                <canvas id="add-active" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('add-active', '#1677ff')">下载 add-active.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>街道 - 未选中</h3>
+                <canvas id="street" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('street', '#94a3b8')">下载 street.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>街道 - 选中</h3>
+                <canvas id="street-active" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('street-active', '#1677ff')">下载 street-active.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>我的 - 未选中</h3>
+                <canvas id="mine" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('mine', '#94a3b8')">下载 mine.png</button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>我的 - 选中</h3>
+                <canvas id="mine-active" width="81" height="81"></canvas>
+                <button onclick="downloadIcon('mine-active', '#1677ff')">下载 mine-active.png</button>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h2>📋 使用说明</h2>
+            <ol>
+                <li>点击每个图标下方的"下载"按钮</li>
+                <li>将下载的PNG文件保存到项目的 <code>static/tabbar/</code> 目录</li>
+                <li>确保文件名与配置一致（如：home.png, home-active.png 等）</li>
+                <li>重新编译小程序即可看到新的图标</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // 图标路径数据（从SVG提取）
+        const icons = {
+            'home': 'M12 3L2 12H5V20H19V12H22L12 3Z',
+            'task': 'M19 3H14.82C14.4 1.84 13.3 1 12 1C10.7 1 9.6 1.84 9.18 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM12 3C12.55 3 13 3.45 13 4C13 4.55 12.55 5 12 5C11.45 5 11 4.55 11 4C11 3.45 11.45 3 12 3ZM14 17H7V15H14V17ZM17 13H7V11H17V13ZM17 9H7V7H17V9Z',
+            'add': 'M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM17 13H13V17H11V13H7V11H11V7H13V11H17V13Z',
+            'street': 'M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM11 11H7V7H11V11ZM17 11H13V7H17V11ZM11 17H7V13H11V17ZM17 17H13V13H17V17Z',
+            'mine': 'M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z'
+        };
+
+        // 绘制图标
+        function drawIcon(canvasId, pathData, color) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // 清空画布（透明背景）
+            ctx.clearRect(0, 0, 81, 81);
+            
+            // 设置颜色
+            ctx.fillStyle = color;
+            
+            // 缩放和居中（SVG viewBox是24x24，需要缩放到81x81）
+            const scale = 2.5; // 约81/24
+            const padding = 10; // 留出边距
+            
+            ctx.save();
+            ctx.translate(padding, padding);
+            ctx.scale(scale, scale);
+            
+            // 解析SVG路径并绘制
+            try {
+                // 处理路径数据，确保以M开头
+                let pathStr = pathData;
+                if (!pathStr.startsWith('M')) {
+                    pathStr = 'M' + pathStr;
+                }
+                
+                // 创建路径
+                const path = new Path2D(pathStr);
+                ctx.fill(path);
+            } catch (e) {
+                console.error('绘制图标失败:', canvasId, e);
+                // 如果路径解析失败，使用简单图形
+                ctx.fillRect(5, 5, 14, 14);
+            }
+            
+            ctx.restore();
+        }
+
+        // 初始化所有图标
+        function initIcons() {
+            const iconTypes = ['home', 'task', 'add', 'street', 'mine'];
+            const colors = {
+                normal: '#94a3b8',
+                active: '#1677ff'
+            };
+            
+            iconTypes.forEach(type => {
+                const path = icons[type];
+                if (path) {
+                    drawIcon(type, path, colors.normal);
+                    drawIcon(type + '-active', path, colors.active);
+                }
+            });
+        }
+
+        // 下载图标
+        function downloadIcon(canvasId, color) {
+            const canvas = document.getElementById(canvasId);
+            const filename = canvasId + '.png';
+            
+            // 重新绘制以确保颜色正确
+            const type = canvasId.replace('-active', '');
+            const path = icons[type];
+            if (path) {
+                drawIcon(canvasId, path, color);
+            }
+            
+            // 转换为blob并下载
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            initIcons();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/admin/user-list",
+    "pages/index/index",
+    "pages/input/index",
+    "pages/street/index",
+    "pages/community/index",
+    "pages/detail/index",
+    "pages/mine/index"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "",
+    "navigationBarBackgroundColor": "#e6f2ff",
+    "backgroundColor": "#e6f2ff"
+  },
+  "tabBar": {
+    "color": "#94a3b8",
+    "selectedColor": "#1677ff",
+    "borderStyle": "white",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "iconPath": "static/tabbar/home.png",
+        "selectedIconPath": "static/tabbar/home-active.png",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/community/index",
+        "iconPath": "static/tabbar/task.png",
+        "selectedIconPath": "static/tabbar/task-active.png",
+        "text": "我的任务"
+      },
+      {
+        "pagePath": "pages/input/index",
+        "iconPath": "static/tabbar/add.png",
+        "selectedIconPath": "static/tabbar/add-active.png",
+        "text": "录入"
+      },
+      {
+        "pagePath": "pages/street/index",
+        "iconPath": "static/tabbar/street.png",
+        "selectedIconPath": "static/tabbar/street-active.png",
+        "text": "街道"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "iconPath": "static/tabbar/mine.png",
+        "selectedIconPath": "static/tabbar/mine-active.png",
+        "text": "我的"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于获取纠纷发生位置"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation",
+    "chooseLocation"
+  ],
+  "usingComponents": {}
+}

@@ -1,0 +1,18 @@
+{
+	"name": "dispute-management-system",
+	"version": "1.0.0",
+	"description": "矛盾纠纷管理系统微信小程序",
+	"main": "main.js",
+	"scripts": {
+		"dev": "uni",
+		"build": "uni build"
+	},
+	"dependencies": {
+		"pinia": "^2.1.7",
+		"vue": "^3.3.4"
+	},
+	"devDependencies": {},
+	"uni-app": {
+		"scripts": {}
+	}
+}

@@ -1,0 +1,49 @@
+{
+	"bsonType": "object",
+	"required": ["entity_id", "action", "user_id"],
+	"properties": {
+		"_id": {
+			"description": "ID，系统自动生成"
+		},
+		"entity_id": {
+			"bsonType": "string",
+			"description": "实体ID（纠纷ID等）",
+			"label": "实体ID"
+		},
+		"entity_type": {
+			"bsonType": "string",
+			"description": "实体类型",
+			"enum": ["dispute", "feedback", "assignment"],
+			"label": "实体类型"
+		},
+		"action": {
+			"bsonType": "string",
+			"description": "操作类型",
+			"enum": ["create", "update", "assign", "feedback", "resolve", "close"],
+			"label": "操作类型"
+		},
+		"user_id": {
+			"bsonType": "string",
+			"description": "用户openid",
+			"label": "用户ID"
+		},
+		"user_name": {
+			"bsonType": "string",
+			"description": "用户名称",
+			"label": "用户名称"
+		},
+		"details": {
+			"bsonType": "object",
+			"description": "操作详情",
+			"label": "操作详情"
+		},
+		"timestamp": {
+			"bsonType": "timestamp",
+			"description": "操作时间",
+			"label": "操作时间",
+			"forceDefaultValue": {
+				"$env": "now"
+			}
+		}
+	}
+}
