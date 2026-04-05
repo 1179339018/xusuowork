@@ -34,7 +34,10 @@
       >
         <view class="user-header">
           <view class="avatar-section">
-            <view class="avatar">{{ item.name ? item.name[0] : '无' }}</view>
+            <view v-if="item.avatar" class="avatar">
+              <image :src="item.avatar" mode="aspectFill" style="width: 100%; height: 100%; border-radius: 50%;" />
+            </view>
+            <view v-else class="avatar">{{ item.name ? item.name[0] : '无' }}</view>
             <view class="bind-badge" :class="{ 'is-bound': item.openid }">
               {{ item.openid ? '已绑定' : '未绑定' }}
             </view>
