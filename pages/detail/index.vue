@@ -503,7 +503,8 @@
 	}
 
 	.content-scroll {
-		padding: 20rpx;
+		padding: 40rpx 20rpx;
+		padding-top: calc(40rpx + env(safe-area-inset-top));
 		height: calc(100vh - 88rpx);
 	}
 	

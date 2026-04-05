@@ -1,5 +1,5 @@
 <template>
-	<view class="container">
+	<view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
 		<scroll-view scroll-y class="form-container">
 			<!-- 表单卡片 -->
 			<view class="form-card">
@@ -14,6 +14,21 @@
 						<view class="picker-box">
 							<text :class="['picker-text', { placeholder: !formData.source }]">
 								{{ formData.source || '请选择纠纷来源' }}
+							</text>
+							<text class="arrow">›</text>
+						</view>
+					</picker>
+				</view>
+				
+				<view class="form-item">
+					<view class="form-label">
+						<text class="label-text">所属社区</text>
+						<text class="required">*</text>
+					</view>
+					<picker mode="selector" :range="communityOptions" :value="communityIndex" @change="onCommunityChange">
+						<view class="picker-box">
+							<text :class="['picker-text', { placeholder: !formData.community }]">
+								{{ formData.community || '请选择所属社区' }}
 							</text>
 							<text class="arrow">›</text>
 						</view>
@@ -94,7 +109,7 @@
 				
 				<view class="form-item">
 					<view class="form-label">
-						<text class="label-text">紧急度</text>
+						<text class="label-text">风险程度</text>
 					</view>
 					<view class="urgency-group">
 						<view 
@@ -142,38 +157,108 @@
 </template>
 
 <script setup>
-	import { ref, reactive } from 'vue'
+	import { ref, reactive, onMounted, onUnmounted } from 'vue'
 	import { useUserStore } from '@/store/user'
 	
 	const userStore = useUserStore()
 	
-	const sourceOptions = ['接处警', '社区摸排', '工作发现']
-	const urgencyOptions = ['一般', '紧急', '特急']
-	const sourceIndex = ref(0)
+	const sourceOptions = ['接处警', '社区摸排', '工作发现', '其他']
+const urgencyOptions = ['低风险', '中风险', '高风险']
+const communityOptions = ['光大街社区', '大来井社区', '核桃湾社区', '火井沱社区', '大湾井社区', '马吃水社区', '芭蕉冲社区', '其他']
+const sourceIndex = ref(0)
+const communityIndex = ref(0)
+const safeAreaTop = ref(0)
 	
 	const formData = reactive({
-		source: '',
-		title: '',
-		description: '',
-		location: {
-			address: '',
-			latitude: null,
-			longitude: null
-		},
-		parties: '',
-		urgency: '一般',
-		occur_count: 1
-	})
+	source: '',
+	title: '',
+	description: '',
+	community: '',
+	location: {
+		address: '',
+		latitude: null,
+		longitude: null
+	},
+	parties: '',
+	urgency: '低风险',
+	occur_count: 1
+})
 	
 	const markers = ref([])
 const submitting = ref(false)
 
-// 获取紧急度对应的类名
+// 获取导航栏配置
+const getNavbarConfig = () => {
+	try {
+		// 获取系统信息
+		const systemInfo = uni.getSystemInfoSync()
+		
+		// 获取胶囊按钮位置信息
+		const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
+		
+		// 状态栏高度
+		const statusBarHeight = systemInfo.statusBarHeight || 0
+		
+		// 胶囊按钮高度
+		const menuButtonHeight = menuButtonInfo.height || 32
+		
+		// 胶囊按钮距离顶部的距离
+		const menuButtonTop = menuButtonInfo.top || 0
+		
+		// 计算导航栏总高度
+		// 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
+		const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
+		
+		// 计算内容区域距离顶部的安全距离
+		// 安全距离 = 状态栏高度 + 导航栏高度
+		const safeAreaTopValue = statusBarHeight + navbarHeight
+		
+		return {
+			statusBarHeight,
+			menuButtonHeight,
+			menuButtonTop,
+			navbarHeight,
+			safeAreaTop: safeAreaTopValue
+		}
+	} catch (error) {
+		console.error('获取导航栏配置失败:', error)
+		// 降级处理：使用默认值
+		return {
+			statusBarHeight: 44,
+			menuButtonHeight: 32,
+			menuButtonTop: 48,
+			navbarHeight: 88,
+			safeAreaTop: 132
+		}
+	}
+}
+
+// 初始化导航栏配置
+const initNavbar = () => {
+	const config = getNavbarConfig()
+	safeAreaTop.value = config.safeAreaTop
+}
+
+// 生命周期
+onMounted(() => {
+	initNavbar()
+	// 监听页面显示事件
+	uni.$on('pageShow', () => {
+		initNavbar()
+	})
+})
+
+// 页面卸载时移除监听
+onUnmounted(() => {
+	uni.$off('pageShow')
+})
+
+// 获取风险程度对应的类名
 function getUrgencyClass(urgency) {
   const classMap = {
-    '一般': 'dot-normal',
-    '紧急': 'dot-urgent',
-    '特急': 'dot-emergency'
+    '低风险': 'dot-normal',
+    '中风险': 'dot-urgent',
+    '高风险': 'dot-emergency'
   }
   return classMap[urgency] || 'dot-normal'
 }
@@ -182,6 +267,12 @@ function getUrgencyClass(urgency) {
 		const index = parseInt(e.detail.value)
 		sourceIndex.value = index
 		formData.source = sourceOptions[index]
+	}
+	
+	function onCommunityChange(e) {
+		const index = parseInt(e.detail.value)
+		communityIndex.value = index
+		formData.community = communityOptions[index]
 	}
 	
 	function increaseCount() {
@@ -198,20 +289,37 @@ function getUrgencyClass(urgency) {
 		try {
 			await uni.chooseLocation({
 				success: (res) => {
-					formData.location = {
-						address: res.address,
-						latitude: res.latitude,
-						longitude: res.longitude
-					}
-					markers.value = [{
-							id: 1,
-							latitude: res.latitude,
-							longitude: res.longitude,
-							title: res.name,
-							width: 30,
-							height: 30
-						}]
-				},
+							formData.location = {
+								address: res.address,
+								latitude: res.latitude,
+								longitude: res.longitude
+							}
+							markers.value = [{
+									id: 1,
+									latitude: res.latitude,
+									longitude: res.longitude,
+									title: res.name,
+									width: 30,
+									height: 30
+								}]
+							
+							// 根据地址自动判断所属社区
+							const address = res.address
+							for (let i = 0; i < communityOptions.length; i++) {
+								const community = communityOptions[i]
+								if (address.includes(community)) {
+									formData.community = community
+									communityIndex.value = i
+									break
+								}
+							}
+							
+							// 如果没有找到匹配的社区，默认为'其他'
+							if (!formData.community) {
+								formData.community = '其他'
+								communityIndex.value = communityOptions.indexOf('其他')
+							}
+						},
 				fail: (err) => {
 					console.error('选择位置失败', err)
 					uni.showToast({ title: '选择位置失败', icon: 'none' })
@@ -225,9 +333,14 @@ function getUrgencyClass(urgency) {
 	
 	async function submitForm() {
 		if (!formData.source) {
-			uni.showToast({ title: '请选择纠纷来源', icon: 'none' })
-			return
-		}
+		uni.showToast({ title: '请选择纠纷来源', icon: 'none' })
+		return
+	}
+	
+	if (!formData.community) {
+		uni.showToast({ title: '请选择所属社区', icon: 'none' })
+		return
+	}
 		
 		if (!formData.title.trim()) {
 			uni.showToast({ title: '请输入纠纷标题', icon: 'none' })
@@ -259,15 +372,17 @@ function getUrgencyClass(urgency) {
 				uni.showToast({ title: '提交成功', icon: 'success' })
 				
 				setTimeout(() => {
-					formData.source = ''
-					formData.title = ''
-					formData.description = ''
-					formData.location = { address: '', latitude: null, longitude: null }
-					formData.parties = ''
-					formData.urgency = '一般'
-					formData.occur_count = 1
-					markers.value = []
-					sourceIndex.value = 0
+				formData.source = ''
+				formData.community = ''
+				formData.title = ''
+				formData.description = ''
+				formData.location = { address: '', latitude: null, longitude: null }
+				formData.parties = ''
+				formData.urgency = '低风险'
+				formData.occur_count = 1
+				markers.value = []
+				sourceIndex.value = 0
+				communityIndex.value = 0
 					
 					uni.switchTab({ url: '/pages/index/index' })
 				}, 1500)
@@ -296,8 +411,8 @@ function getUrgencyClass(urgency) {
 	.container {
 		min-height: 100vh;
 		background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
-		padding: 100rpx 20rpx;
-		padding-top: calc(100rpx + env(safe-area-inset-top));
+		padding: 60rpx 20rpx;
+		padding-top: calc(60rpx + env(safe-area-inset-top));
 		box-sizing: border-box;
 	}
 	

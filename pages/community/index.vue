@@ -218,8 +218,8 @@
 		background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
 		display: flex;
 		flex-direction: column;
-		padding: 100rpx 20rpx;
-		padding-top: calc(100rpx + env(safe-area-inset-top));
+		padding: 60rpx 20rpx;
+		padding-top: calc(60rpx + env(safe-area-inset-top));
 		box-sizing: border-box;
 	}
 	

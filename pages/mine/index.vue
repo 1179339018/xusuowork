@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
     <!-- 用户信息卡片 -->
     <view class="user-card">
       <view class="avatar-section" @click="handleAvatarClick">
@@ -79,11 +79,39 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
+const safeAreaTop = ref(0)
 
+// 获取导航栏配置
+const getNavbarConfig = () => {
+  try {
+    const systemInfo = uni.getSystemInfoSync()
+    const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
+    
+    const statusBarHeight = systemInfo.statusBarHeight || 0
+    const menuButtonHeight = menuButtonInfo.height || 32
+    const menuButtonTop = menuButtonInfo.top || 0
+    
+    const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
+    const safeAreaTopValue = statusBarHeight + navbarHeight
+    
+    return { statusBarHeight, menuButtonHeight, menuButtonTop, navbarHeight, safeAreaTop: safeAreaTopValue }
+  } catch (error) {
+    console.error('获取导航栏配置失败:', error)
+    return { statusBarHeight: 44, menuButtonHeight: 32, menuButtonTop: 48, navbarHeight: 88, safeAreaTop: 132 }
+  }
+}
+
+// 初始化导航栏配置
+const initNavbar = () => {
+  const config = getNavbarConfig()
+  safeAreaTop.value = config.safeAreaTop
+}
+
+// 角色判断
 const canSwitchRole = computed(() => {
   return userStore.authorized_roles && userStore.authorized_roles.length > 1
 })
@@ -92,6 +120,7 @@ const isAdmin = computed(() => {
   return userStore.authorized_roles && userStore.authorized_roles.includes('管理员')
 })
 
+// 功能方法
 const handleAvatarClick = () => {
   if (!userStore.isLogin) {
     uni.showToast({ title: '请先登录', icon: 'none' })
@@ -100,17 +129,16 @@ const handleAvatarClick = () => {
   
   const itemList = ['上传头像']
   if (userStore.avatar) {
-    itemList.push('查看大头像')
+    itemList.push('查看头像')
   }
   
   uni.showActionSheet({
     itemList,
-    success: (res) => {
-      const action = itemList[res.tapIndex]
-      if (action === '上传头像') {
-        uploadAvatar()
-      } else if (action === '查看大头像') {
-        previewAvatar()
+    success: async (res) => {
+      if (res.tapIndex === 0) {
+        await uploadAvatar()
+      } else if (res.tapIndex === 1 && userStore.avatar) {
+        uni.previewImage({ urls: [userStore.avatar] })
       }
     }
   })
@@ -118,14 +146,17 @@ const handleAvatarClick = () => {
 
 const uploadAvatar = async () => {
   try {
-    const chooseRes = await uni.chooseImage({
+    uni.showLoading({ title: '选择图片...' })
+    
+    const res = await uni.chooseImage({
       count: 1,
       sizeType: ['compressed'],
       sourceType: ['album', 'camera']
     })
     
-    const tempFilePath = chooseRes.tempFilePaths[0]
-    if (!tempFilePath) return
+    if (!res.tempFilePaths || res.tempFilePaths.length === 0) return
+    
+    const tempFilePath = res.tempFilePaths[0]
     
     uni.showLoading({ title: '上传中...' })
     
@@ -135,27 +166,20 @@ const uploadAvatar = async () => {
     })
     
     const fileID = uploadRes.fileID || uploadRes.fileId
-    if (!fileID) {
-      throw new Error('上传失败，请稍后重试')
-    }
+    if (!fileID) throw new Error('上传失败，请稍后重试')
     
     const { result } = await uniCloud.callFunction({
       name: 'updateUserInfo',
-      data: {
-        openid: userStore.openid,
-        avatar: fileID
-      }
+      data: { openid: userStore.openid, avatar: fileID }
     })
     
-    if (!result || !result.success) {
-      throw new Error(result && result.error || '更新失败')
-    }
+    if (!result || !result.success) throw new Error(result?.error || '更新失败')
     
     userStore.avatar = fileID
     uni.showToast({ title: '头像已更新', icon: 'success' })
     
   } catch (error) {
-    if (error && error.errMsg && error.errMsg.includes('cancel')) return
+    if (error?.errMsg?.includes('cancel')) return
     console.error('上传头像失败', error)
     uni.showToast({ title: error.message || '上传失败', icon: 'none' })
   } finally {
@@ -163,19 +187,44 @@ const uploadAvatar = async () => {
   }
 }
 
-const previewAvatar = () => {
-  if (userStore.avatar) {
-    uni.previewImage({
-      current: userStore.avatar,
-      urls: [userStore.avatar]
-    })
-  } else {
-    uni.showToast({ title: '请先上传头像', icon: 'none' })
-  }
+const editName = () => {
+  if (!userStore.isLogin) return
+  
+  uni.showModal({
+    title: '修改姓名',
+    content: userStore.name,
+    editable: true,
+    success: async (res) => {
+      if (res.confirm && res.content && res.content !== userStore.name) {
+        try {
+          uni.showLoading({ title: '更新中...' })
+          
+          const { result } = await uniCloud.callFunction({
+            name: 'updateUserInfo',
+            data: { openid: userStore.openid, name: res.content }
+          })
+          
+          if (!result || !result.success) throw new Error(result?.error || '更新失败')
+          
+          userStore.name = res.content
+          uni.showToast({ title: '姓名已更新', icon: 'success' })
+          
+        } catch (error) {
+          console.error('更新姓名失败', error)
+          uni.showToast({ title: error.message || '更新失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+        }
+      }
+    }
+  })
 }
 
+// 切换角色
 const switchRole = () => {
-  const roles = [...userStore.authorized_roles]
+  if (!canSwitchRole.value) return
+  
+  const roles = userStore.authorized_roles || []
   uni.showActionSheet({
     itemList: roles,
     success: (res) => {
@@ -214,45 +263,6 @@ const subscribeMessage = () => {
   })
 }
 
-const editName = () => {
-  if (!userStore.isLogin) return
-  
-  uni.showModal({
-    title: '修改姓名',
-    content: userStore.name,
-    editable: true,
-    success: async (res) => {
-      if (res.confirm && res.content && res.content !== userStore.name) {
-        try {
-          uni.showLoading({ title: '更新中...' })
-          
-          const { result } = await uniCloud.callFunction({
-            name: 'updateUserInfo',
-            data: {
-              openid: userStore.openid,
-              name: res.content
-            }
-          })
-          
-          if (result && result.success) {
-            userStore.setUser({
-              ...userStore.$state,
-              name: res.content
-            })
-            uni.showToast({ title: '修改成功', icon: 'success' })
-          } else {
-            throw new Error(result && result.error || '更新失败')
-          }
-        } catch (error) {
-          uni.showToast({ title: error.message || '修改失败', icon: 'none' })
-        } finally {
-          uni.hideLoading()
-        }
-      }
-    }
-  })
-}
-
 const logout = () => {
   uni.showModal({
     title: '确认退出',
@@ -260,22 +270,28 @@ const logout = () => {
     success: (res) => {
       if (res.confirm) {
         userStore.logout()
-        uni.showToast({ title: '已退出登录', icon: 'success' })
-        setTimeout(() => {
-          uni.reLaunch({ url: '/pages/login/index' })
-        }, 1500)
+        uni.reLaunch({ url: '/pages/login/index' })
       }
     }
   })
 }
+
+// 生命周期
+onMounted(() => {
+  initNavbar()
+  uni.$on('pageShow', initNavbar)
+})
+
+onUnmounted(() => {
+  uni.$off('pageShow', initNavbar)
+})
 </script>
 
 <style lang="scss" scoped>
 .container {
   min-height: 100vh;
   background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
-  padding: 100rpx 20rpx;
-  padding-top: calc(100rpx + env(safe-area-inset-top));
+  padding: 20rpx;
   box-sizing: border-box;
 }
 
@@ -286,96 +302,74 @@ const logout = () => {
   padding: 40rpx;
   margin-bottom: 20rpx;
   box-shadow: 0 8rpx 32rpx rgba(22, 119, 255, 0.25);
-  position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
-  }
   
   .avatar-section {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    margin-bottom: 24rpx;
-    position: relative;
-    z-index: 1;
+    margin-bottom: 20rpx;
     
     .avatar {
-      width: 140rpx;
-      height: 140rpx;
-      background: rgba(255,255,255,0.2);
-      border-radius: 70rpx;
+      width: 120rpx;
+      height: 120rpx;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 4rpx solid rgba(255,255,255,0.4);
-      overflow: hidden;
-      margin-bottom: 16rpx;
-      
-      .avatar-text {
-        font-size: 56rpx;
-        font-weight: 600;
-        color: #fff;
-      }
+      margin-right: 20rpx;
       
       .avatar-img {
         width: 100%;
         height: 100%;
-        border-radius: 70rpx;
+        border-radius: 50%;
+      }
+      
+      .avatar-text {
+        font-size: 48rpx;
+        color: #fff;
+        font-weight: bold;
       }
     }
     
     .avatar-tip {
-      font-size: 22rpx;
-      color: rgba(255,255,255,0.8);
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 24rpx;
     }
   }
   
   .info-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    z-index: 1;
-    
     .name-row {
       display: flex;
       align-items: center;
-      margin-bottom: 16rpx;
+      margin-bottom: 10rpx;
       
       .name {
-        font-size: 40rpx;
-        font-weight: 700;
+        font-size: 36rpx;
         color: #fff;
+        font-weight: bold;
+        margin-right: 10rpx;
       }
       
       .edit-icon {
-        margin-left: 12rpx;
         font-size: 24rpx;
-        opacity: 0.9;
+        color: rgba(255, 255, 255, 0.7);
       }
     }
     
     .role-tag {
       display: flex;
       align-items: center;
-      gap: 8rpx;
-      background: rgba(255,255,255,0.2);
-      padding: 10rpx 24rpx;
-      border-radius: 24rpx;
-      font-size: 26rpx;
-      color: #fff;
-      font-weight: 500;
-      border: 1rpx solid rgba(255,255,255,0.3);
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8rpx 16rpx;
+      border-radius: 20rpx;
       
       .role-icon {
+        margin-right: 8rpx;
+        font-size: 24rpx;
+      }
+      
+      text {
+        color: #fff;
         font-size: 24rpx;
       }
     }
@@ -385,17 +379,16 @@ const logout = () => {
 /* 菜单卡片 */
 .menu-card {
   background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
+  border-radius: 20rpx;
+  padding: 0;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 12rpx rgba(22, 119, 255, 0.06);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
   
   .menu-title {
+    padding: 24rpx 32rpx;
     font-size: 28rpx;
-    font-weight: 600;
+    font-weight: bold;
     color: #333;
-    margin-bottom: 16rpx;
-    padding-bottom: 16rpx;
     border-bottom: 1rpx solid #f0f0f0;
   }
   
@@ -404,28 +397,24 @@ const logout = () => {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 24rpx 0;
-      border-bottom: 1rpx solid #f5f5f5;
+      padding: 24rpx 32rpx;
+      border-bottom: 1rpx solid #f0f0f0;
       
       &:last-child {
         border-bottom: none;
       }
       
-      &:active {
-        opacity: 0.7;
-      }
-      
       .item-left {
         display: flex;
         align-items: center;
-        gap: 16rpx;
         
         .item-icon {
           font-size: 32rpx;
+          margin-right: 16rpx;
         }
         
         .menu-text {
-          font-size: 30rpx;
+          font-size: 28rpx;
           color: #333;
         }
       }
@@ -433,17 +422,17 @@ const logout = () => {
       .item-right {
         display: flex;
         align-items: center;
-        gap: 12rpx;
         
         .item-value {
-          font-size: 26rpx;
+          font-size: 24rpx;
+          color: #666;
+          margin-right: 8rpx;
+        }
+        
+        .arrow {
+          font-size: 24rpx;
           color: #999;
         }
-      }
-      
-      .arrow {
-        font-size: 32rpx;
-        color: #ccc;
       }
     }
   }
@@ -451,32 +440,21 @@ const logout = () => {
 
 /* 退出登录 */
 .logout-section {
-  padding: 20rpx 0;
-  
   .btn-logout {
     width: 100%;
-    height: 88rpx;
+    background: #fff;
+    border: 1rpx solid #ff4d4f;
+    color: #ff4d4f;
+    border-radius: 12rpx;
+    padding: 24rpx;
+    font-size: 28rpx;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12rpx;
-    background: #fff;
-    border-radius: 44rpx;
-    font-size: 30rpx;
-    color: #ff4d4f;
-    font-weight: 500;
-    box-shadow: 0 2rpx 12rpx rgba(255, 77, 79, 0.1);
-    
-    &:active {
-      background: #fff1f0;
-    }
-    
-    &::after {
-      border: none;
-    }
     
     .logout-icon {
-      font-size: 28rpx;
+      margin-right: 8rpx;
+      font-size: 24rpx;
     }
   }
 }

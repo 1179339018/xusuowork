@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
     <view class="header">
       <view class="logo-wrapper">
         <text class="logo-icon">⚖️</text>
@@ -40,12 +40,79 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
 const loading = ref(false)
 const phone = ref('')
+const safeAreaTop = ref(0)
+
+// 获取导航栏配置
+const getNavbarConfig = () => {
+  try {
+    // 获取系统信息
+    const systemInfo = uni.getSystemInfoSync()
+    
+    // 获取胶囊按钮位置信息
+    const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
+    
+    // 状态栏高度
+    const statusBarHeight = systemInfo.statusBarHeight || 0
+    
+    // 胶囊按钮高度
+    const menuButtonHeight = menuButtonInfo.height || 32
+    
+    // 胶囊按钮距离顶部的距离
+    const menuButtonTop = menuButtonInfo.top || 0
+    
+    // 计算导航栏总高度
+    // 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
+    const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
+    
+    // 计算内容区域距离顶部的安全距离
+    // 安全距离 = 状态栏高度 + 导航栏高度
+    const safeAreaTopValue = statusBarHeight + navbarHeight
+    
+    return {
+      statusBarHeight,
+      menuButtonHeight,
+      menuButtonTop,
+      navbarHeight,
+      safeAreaTop: safeAreaTopValue
+    }
+  } catch (error) {
+    console.error('获取导航栏配置失败:', error)
+    // 降级处理：使用默认值
+    return {
+      statusBarHeight: 44,
+      menuButtonHeight: 32,
+      menuButtonTop: 48,
+      navbarHeight: 88,
+      safeAreaTop: 132
+    }
+  }
+}
+
+// 初始化导航栏配置
+const initNavbar = () => {
+  const config = getNavbarConfig()
+  safeAreaTop.value = config.safeAreaTop
+}
+
+// 生命周期
+onMounted(() => {
+  initNavbar()
+  // 监听页面显示事件
+  uni.$on('pageShow', () => {
+    initNavbar()
+  })
+})
+
+// 页面卸载时移除监听
+onUnmounted(() => {
+  uni.$off('pageShow')
+})
 
 // 手动登录（带手机号）
 const handleLogin = async () => {
@@ -109,7 +176,7 @@ const handleLogin = async () => {
 .container {
   min-height: 100vh;
   background: linear-gradient(135deg, #1677ff, #4096ff);
-  padding: 40rpx;
+  padding: 20rpx 40rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -223,7 +290,7 @@ const handleLogin = async () => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   color: #fff;
   font-size: 32rpx;
   font-weight: 600;

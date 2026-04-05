@@ -1,7 +1,7 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
     <!-- 自定义导航栏 -->
-    <view class="nav-bar">
+    <view class="nav-bar" :style="{ height: safeAreaTop + 'px' }">
       <view class="nav-left" @click="goBack">
         <text class="back-icon">←</text>
       </view>
@@ -156,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
@@ -165,6 +165,7 @@ const userList = ref([])
 const loading = ref(false)
 const showModal = ref(false)
 const isEdit = ref(false)
+const safeAreaTop = ref(0)
 
 const roleOptions = ['派出所', '街道', '社区', '管理员']
 
@@ -180,8 +181,70 @@ const form = reactive({
   roles: []
 })
 
+// 获取导航栏配置
+const getNavbarConfig = () => {
+  try {
+    // 获取系统信息
+    const systemInfo = uni.getSystemInfoSync()
+    
+    // 获取胶囊按钮位置信息
+    const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
+    
+    // 状态栏高度
+    const statusBarHeight = systemInfo.statusBarHeight || 0
+    
+    // 胶囊按钮高度
+    const menuButtonHeight = menuButtonInfo.height || 32
+    
+    // 胶囊按钮距离顶部的距离
+    const menuButtonTop = menuButtonInfo.top || 0
+    
+    // 计算导航栏总高度
+    // 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
+    const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
+    
+    // 计算内容区域距离顶部的安全距离
+    // 安全距离 = 状态栏高度 + 导航栏高度
+    const safeAreaTopValue = statusBarHeight + navbarHeight
+    
+    return {
+      statusBarHeight,
+      menuButtonHeight,
+      menuButtonTop,
+      navbarHeight,
+      safeAreaTop: safeAreaTopValue
+    }
+  } catch (error) {
+    console.error('获取导航栏配置失败:', error)
+    // 降级处理：使用默认值
+    return {
+      statusBarHeight: 44,
+      menuButtonHeight: 32,
+      menuButtonTop: 48,
+      navbarHeight: 88,
+      safeAreaTop: 132
+    }
+  }
+}
+
+// 初始化导航栏配置
+const initNavbar = () => {
+  const config = getNavbarConfig()
+  safeAreaTop.value = config.safeAreaTop
+}
+
 onMounted(() => {
+  initNavbar()
+  // 监听页面显示事件
+  uni.$on('pageShow', () => {
+    initNavbar()
+  })
   loadUserList()
+})
+
+// 页面卸载时移除监听
+onUnmounted(() => {
+  uni.$off('pageShow')
 })
 
 // 获取角色样式类
@@ -432,29 +495,32 @@ const goBack = () => {
 
 <style lang="scss" scoped>
 .container {
-  min-height: 100vh;
-  background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
+		min-height: 100vh;
+		background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
+		display: flex;
+		flex-direction: column;
+		padding: 0 20rpx;
+		box-sizing: border-box;
+	}
 
 /* 导航栏 */
 .nav-bar {
-  height: 88rpx;
   background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  padding: 0 24rpx;
+  padding: 0 20rpx 12rpx 20rpx;
   box-shadow: 0 2rpx 12rpx rgba(22, 119, 255, 0.1);
-  position: sticky;
-  top: 0;
   z-index: 99;
+  margin: 0 -20rpx;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   
   .nav-left {
     width: 80rpx;
-    height: 100%;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -473,10 +539,15 @@ const goBack = () => {
     font-size: 32rpx;
     font-weight: 600;
     color: #fff;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .nav-right {
     width: 80rpx;
+    height: 44px;
   }
 }
 
@@ -485,7 +556,7 @@ const goBack = () => {
   background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   border-radius: 24rpx;
   padding: 32rpx;
-  margin: 20rpx;
+  margin: 20rpx 0;
   margin-bottom: 24rpx;
   display: flex;
   justify-content: space-between;
@@ -567,16 +638,28 @@ const goBack = () => {
 /* 用户列表 */
 .user-list {
   flex: 1;
-  padding: 0 20rpx;
+  padding: 40rpx 20rpx;
+  padding-top: calc(40rpx + env(safe-area-inset-top));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .user-card {
   background: #fff;
   border-radius: 20rpx;
-  padding: 28rpx;
-  margin-bottom: 20rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
   box-shadow: 0 4rpx 16rpx rgba(22, 119, 255, 0.08);
   border: 1rpx solid rgba(22, 119, 255, 0.08);
+  width: 100%;
+  max-width: 600rpx;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 6rpx 24rpx rgba(22, 119, 255, 0.12);
+    transform: translateY(-2rpx);
+  }
 }
 
 .user-header {

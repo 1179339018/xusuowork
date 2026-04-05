@@ -1,5 +1,5 @@
 <template>
-	<view class="container">
+	<view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
 		<!-- 派出所视图 -->
 		<view v-if="isPolice" class="police-view">
 			<view class="action-card">
@@ -152,23 +152,41 @@
 				<view class="section-title">数据导出</view>
 				<view class="export-form">
 					<view class="form-row">
-						<text class="form-label">状态筛选</text>
-						<picker mode="selector" :range="statusOptions" :value="statusIndex" @change="onStatusChange">
-							<view class="picker-input">
-								<text>{{statusOptions[statusIndex]}}</text>
-								<text class="arrow">›</text>
+								<text class="form-label">状态筛选</text>
+								<picker mode="selector" :range="statusOptions" :value="statusIndex" @change="onStatusChange">
+									<view class="picker-input">
+										<text>{{statusOptions[statusIndex]}}</text>
+										<text class="arrow">›</text>
+									</view>
+								</picker>
 							</view>
-						</picker>
-					</view>
-					<view class="form-row">
-						<text class="form-label">开始日期</text>
-						<picker mode="date" @change="onStartDateChange">
-							<view class="picker-input">
-								<text>{{startDate || '请选择'}}</text>
-								<text class="arrow">›</text>
+							<view class="form-row">
+								<text class="form-label">社区筛选</text>
+								<picker mode="selector" :range="communityOptions" :value="communityIndex" @change="onCommunityChange">
+									<view class="picker-input">
+										<text>{{communityOptions[communityIndex]}}</text>
+										<text class="arrow">›</text>
+									</view>
+								</picker>
 							</view>
-						</picker>
-					</view>
+							<view class="form-row">
+								<text class="form-label">风险程度</text>
+								<picker mode="selector" :range="riskLevelOptions" :value="riskLevelIndex" @change="onRiskLevelChange">
+									<view class="picker-input">
+										<text>{{riskLevelOptions[riskLevelIndex]}}</text>
+										<text class="arrow">›</text>
+									</view>
+								</picker>
+							</view>
+							<view class="form-row">
+								<text class="form-label">开始日期</text>
+								<picker mode="date" @change="onStartDateChange">
+									<view class="picker-input">
+										<text>{{startDate || '请选择'}}</text>
+										<text class="arrow">›</text>
+									</view>
+								</picker>
+							</view>
 					<view class="form-row">
 						<text class="form-label">结束日期</text>
 						<picker mode="date" @change="onEndDateChange">
@@ -207,31 +225,88 @@
 </template>
 
 <script>
-	import { ref, computed, onMounted } from 'vue'
+	import { ref, computed, onMounted, onUnmounted } from 'vue'
 	import { useUserStore } from '@/store/user'
 	import { useDisputeStore } from '@/store/dispute'
 	
 	export default {
 		setup() {
-			const userStore = useUserStore()
-			const disputeStore = useDisputeStore()
-			
-			const isLoading = ref(false)
-			const statistics = ref({
-				todayNew: 0,
-				pendingAssign: 0,
-				pendingVisit: 0,
-				pendingPolice: 0,
-				resolved: 0,
-				resolveRate: '0.0',
-				totalCount: 0,
-				userCount: 0
-			})
-			const recentDisputes = ref([])
-			const startDate = ref('')
-			const endDate = ref('')
-			const statusOptions = ['全部', '待分派', '待回访', '处理中', '已化解', '已关闭']
-			const statusIndex = ref(0)
+				const userStore = useUserStore()
+				const disputeStore = useDisputeStore()
+				
+				const isLoading = ref(false)
+				const statistics = ref({
+					todayNew: 0,
+					pendingAssign: 0,
+					pendingVisit: 0,
+					pendingPolice: 0,
+					resolved: 0,
+					resolveRate: '0.0',
+					totalCount: 0,
+					userCount: 0
+				})
+				const recentDisputes = ref([])
+				const startDate = ref('')
+				const endDate = ref('')
+				const statusOptions = ['全部', '待分派', '待回访', '处理中', '已化解', '已关闭']
+				const statusIndex = ref(0)
+				const communityOptions = ['全部', '光大街社区', '大来井社区', '核桃湾社区', '火井沱社区', '大湾井社区', '马吃水社区', '芭蕉冲社区', '其他']
+				const communityIndex = ref(0)
+				const riskLevelOptions = ['全部', '低风险', '中风险', '高风险']
+				const riskLevelIndex = ref(0)
+				const safeAreaTop = ref(0)
+				
+				// 获取导航栏配置
+				const getNavbarConfig = () => {
+					try {
+						// 获取系统信息
+						const systemInfo = uni.getSystemInfoSync()
+						
+						// 获取胶囊按钮位置信息
+						const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
+						
+						// 状态栏高度
+						const statusBarHeight = systemInfo.statusBarHeight || 0
+						
+						// 胶囊按钮高度
+						const menuButtonHeight = menuButtonInfo.height || 32
+						
+						// 胶囊按钮距离顶部的距离
+						const menuButtonTop = menuButtonInfo.top || 0
+						
+						// 计算导航栏总高度
+						// 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
+						const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
+						
+						// 计算内容区域距离顶部的安全距离
+						// 安全距离 = 状态栏高度 + 导航栏高度
+						const safeAreaTopValue = statusBarHeight + navbarHeight
+						
+						return {
+							statusBarHeight,
+							menuButtonHeight,
+							menuButtonTop,
+							navbarHeight,
+							safeAreaTop: safeAreaTopValue
+						}
+					} catch (error) {
+						console.error('获取导航栏配置失败:', error)
+						// 降级处理：使用默认值
+						return {
+							statusBarHeight: 44,
+							menuButtonHeight: 32,
+							menuButtonTop: 48,
+							navbarHeight: 88,
+							safeAreaTop: 132
+						}
+					}
+				}
+				
+				// 初始化导航栏配置
+				const initNavbar = () => {
+					const config = getNavbarConfig()
+					safeAreaTop.value = config.safeAreaTop
+				}
 			
 			// 计算属性
 			const userInfo = computed(() => ({
@@ -298,6 +373,14 @@
 			
 			const onStatusChange = (e) => {
 				statusIndex.value = Number(e.detail.value) || 0
+			}
+			
+			const onCommunityChange = (e) => {
+				communityIndex.value = Number(e.detail.value) || 0
+			}
+			
+			const onRiskLevelChange = (e) => {
+				riskLevelIndex.value = Number(e.detail.value) || 0
 			}
 			
 			const resetForm = () => {
@@ -414,7 +497,32 @@
 									
 									// 打开文件
 									wx.openDocument({
-										filePath: tempFilePath
+										filePath: tempFilePath,
+										success: (res) => {
+											// 导出成功后显示操作菜单，包含转发到微信的选项
+											uni.showActionSheet({
+												itemList: ['转发到微信'],
+												success: (actionRes) => {
+													if (actionRes.tapIndex === 0) {
+														// 转发到微信
+														wx.shareFileMessage({
+															filePath: tempFilePath,
+															title: fileName,
+															success: (shareRes) => {
+																console.log('转发成功', shareRes)
+															},
+															fail: (shareErr) => {
+																console.error('转发失败', shareErr)
+																uni.showToast({
+																	title: '转发失败',
+																	icon: 'none'
+																})
+															}
+														})
+													}
+												}
+											})
+										}
 									})
 								},
 								fail: (err) => {
@@ -527,7 +635,8 @@
 			
 			// 检查登录状态
 			const checkLogin = () => {
-				if (!userStore.isLogin) {
+				// 检查用户是否已登录，或者是否有存储的用户信息
+				if (!userStore.isLogin && !userStore.openid) {
 					uni.redirectTo({
 						url: '/pages/login/index'
 					})
@@ -538,18 +647,39 @@
 			
 			// 生命周期
 			onMounted(async () => {
-				if (checkLogin()) {
-					// 并行执行数据获取，减少加载时间
-					try {
-						isLoading.value = true
-						await Promise.all([
-							loadStatistics(),
-							loadRecentDisputes()
-						])
-					} finally {
-						isLoading.value = false
+				initNavbar()
+				
+				// 延迟一下，等待 Pinia 完成状态恢复
+				setTimeout(() => {
+					if (checkLogin()) {
+						// 并行执行数据获取，减少加载时间
+						try {
+							isLoading.value = true
+							Promise.all([
+								loadStatistics(),
+								loadRecentDisputes()
+							]).finally(() => {
+								isLoading.value = false
+							})
+						} catch (error) {
+							isLoading.value = false
+							console.error('数据加载失败:', error)
+						}
 					}
-				}
+				}, 100)
+			})
+			
+			// 页面显示时重新计算（防止横屏切换等情况）
+			onMounted(() => {
+				// 监听页面显示事件
+				uni.$on('pageShow', () => {
+					initNavbar()
+				})
+			})
+			
+			// 页面卸载时移除监听
+			onUnmounted(() => {
+				uni.$off('pageShow')
 			})
 			
 			// 下拉刷新
@@ -579,6 +709,11 @@
 				endDate,
 				statusOptions,
 				statusIndex,
+				communityOptions,
+				communityIndex,
+				riskLevelOptions,
+				riskLevelIndex,
+				safeAreaTop,
 				goToInput,
 				goToStreetManage,
 				goToDetail,
@@ -599,8 +734,7 @@
 	.container {
 		min-height: 100vh;
 		background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
-		padding: 100rpx 20rpx;
-		padding-top: calc(100rpx + env(safe-area-inset-top));
+		padding: 20rpx 20rpx;
 		box-sizing: border-box;
 	}
 	

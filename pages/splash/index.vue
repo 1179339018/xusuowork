@@ -36,15 +36,43 @@
         try {
           const userStore = useUserStore()
           
+          // 添加调试信息
+          console.log('检查登录状态 - userStore:', {
+            isLogin: userStore.isLogin,
+            openid: userStore.openid,
+            role: userStore.role,
+            manuallyLoggedOut: userStore.manuallyLoggedOut
+          })
+          
+          // 直接从本地存储中读取用户信息，确保在 Pinia 完成状态恢复之前就能获取到
+          const storedUser = uni.getStorageSync('user')
+          console.log('本地存储中的用户信息:', storedUser)
+          
           // 如果用户手动退出，跳过自动登录
-          if (userStore.manuallyLoggedOut) {
+          if (userStore.manuallyLoggedOut || (storedUser && storedUser.manuallyLoggedOut)) {
+            console.log('用户手动退出，跳转到登录页面')
             uni.redirectTo({
               url: '/pages/login/index'
             })
             return
           }
           
-          // 先尝试微信自动登录（检查该微信是否已绑定）
+          // 先检查本地存储中是否已有用户信息
+          if ((userStore.openid && userStore.role) || (storedUser && storedUser.openid && storedUser.role)) {
+            console.log('检测到用户已登录，跳转到首页')
+            // 本地已有用户信息，直接跳转到首页
+            // 如果 Pinia 还没有恢复状态，手动设置用户信息
+            if (!userStore.isLogin && storedUser) {
+              console.log('Pinia 状态未恢复，手动设置用户信息')
+              userStore.setUser(storedUser)
+            }
+            uni.switchTab({
+              url: '/pages/index/index'
+            })
+            return
+          }
+          
+          // 尝试微信自动登录（检查该微信是否已绑定）
           const loginRes = await Promise.race([
             uni.login({
               provider: 'weixin'
