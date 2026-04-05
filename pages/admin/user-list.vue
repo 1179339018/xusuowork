@@ -3,7 +3,9 @@
     <!-- 自定义导航栏 -->
     <view class="nav-bar" :style="{ height: safeAreaTop + 'px' }">
       <view class="nav-left" @click="goBack">
-        <text class="back-icon">←</text>
+        <view class="back-icon">
+          <text>←</text>
+        </view>
       </view>
       <view class="nav-title">用户管理</view>
       <view class="nav-right"></view>
@@ -529,10 +531,15 @@ const goBack = () => {
     justify-content: flex-start;
     
     .back-icon {
-      font-size: 40rpx;
+      font-size: 48rpx;
       color: #fff;
       font-weight: bold;
       line-height: 1;
+      transition: all 0.3s ease;
+      
+      &:active {
+        transform: scale(0.95);
+      }
     }
   }
   
