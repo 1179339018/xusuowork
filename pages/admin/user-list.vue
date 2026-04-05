@@ -514,7 +514,7 @@ const goBack = () => {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 0 20rpx 12rpx 20rpx;
+  padding: 0 20rpx 12rpx 30rpx;
   box-shadow: 0 2rpx 12rpx rgba(22, 119, 255, 0.1);
   z-index: 99;
   margin: 0 -20rpx;
