@@ -22,6 +22,11 @@
 			"description": "纠纷描述",
 			"label": "描述"
 		},
+		"community": {
+			"bsonType": "string",
+			"description": "所属社区",
+			"label": "所属社区"
+		},
 		"location": {
 			"bsonType": "object",
 			"description": "位置信息",

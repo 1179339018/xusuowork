@@ -1,205 +1,258 @@
 <template>
   <view class="splash-container">
-    <view class="logo-section">
-      <view class="logo">
-        <text class="logo-icon">⚖️</text>
-        <text class="logo-text">矛盾纠纷管理系统</text>
+    <view class="halo halo-left"></view>
+    <view class="halo halo-right"></view>
+
+    <view class="brand-block">
+      <view class="brand-mark">
+        <text class="brand-mark-text">衡</text>
       </view>
-      <view class="slogan">快速响应 · 高效解决</view>
+      <text class="brand-title">矛盾纠纷管理系统</text>
+      <text class="brand-subtitle">基层治理协同、任务闭环与过程留痕</text>
     </view>
-    
-    <view class="loading-section">
-      <view class="loading-spinner"></view>
-      <text class="loading-text">正在加载中...</text>
+
+    <view class="status-card">
+      <view class="status-line">
+        <view class="spinner"></view>
+        <text class="status-title">正在初始化系统</text>
+      </view>
+      <text class="status-desc">校验登录状态并准备工作台，请稍候片刻。</text>
     </view>
-    
-    <view class="footer">
-      <text class="version">版本 1.0.0</text>
-    </view>
+
+    <view class="version-chip">版本 1.0.0</view>
   </view>
 </template>
 
 <script>
-  import { useUserStore } from '@/store/user'
-  
-  export default {
-    onLoad() {
-      this.checkLogin()
+import { useUserStore } from '@/store/user'
+import { goHomeByRole } from '@/utils/navigation'
+
+export default {
+  onLoad() {
+    this.checkLogin()
+  },
+  methods: {
+    createTimeoutPromise(message, timeout = 30000) {
+      return new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(message)), timeout)
+      })
     },
-    methods: {
-      async checkLogin() {
-        // 设置超时处理，避免长时间等待
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('登录超时')), 8000)
-        })
-        
-        try {
-          const userStore = useUserStore()
-          
-          // 添加调试信息
-          console.log('检查登录状态 - userStore:', {
-            isLogin: userStore.isLogin,
-            openid: userStore.openid,
-            role: userStore.role,
-            manuallyLoggedOut: userStore.manuallyLoggedOut
-          })
-          
-          // 直接从本地存储中读取用户信息，确保在 Pinia 完成状态恢复之前就能获取到
-          const storedUser = uni.getStorageSync('user')
-          console.log('本地存储中的用户信息:', storedUser)
-          
-          // 如果用户手动退出，跳过自动登录
-          if (userStore.manuallyLoggedOut || (storedUser && storedUser.manuallyLoggedOut)) {
-            console.log('用户手动退出，跳转到登录页面')
-            uni.redirectTo({
-              url: '/pages/login/index'
-            })
-            return
-          }
-          
-          // 先检查本地存储中是否已有用户信息
-          if ((userStore.openid && userStore.role) || (storedUser && storedUser.openid && storedUser.role)) {
-            console.log('检测到用户已登录，跳转到首页')
-            // 本地已有用户信息，直接跳转到首页
-            // 如果 Pinia 还没有恢复状态，手动设置用户信息
-            if (!userStore.isLogin && storedUser) {
-              console.log('Pinia 状态未恢复，手动设置用户信息')
-              userStore.setUser(storedUser)
-            }
-            uni.switchTab({
-              url: '/pages/index/index'
-            })
-            return
-          }
-          
-          // 尝试微信自动登录（检查该微信是否已绑定）
-          const loginRes = await Promise.race([
-            uni.login({
-              provider: 'weixin'
-            }),
-            timeoutPromise
-          ])
-          
-          if (loginRes.errMsg === 'login:ok') {
-            // 调用云函数检查该微信是否已绑定
-            const { result } = await Promise.race([
-              uniCloud.callFunction({
-                name: 'checkBind',
-                data: {
-                  code: loginRes.code
-                }
-              }),
-              timeoutPromise
-            ])
-            
-            if (result && result.success && result.isBound) {
-              // 微信已绑定，自动登录
-              userStore.setUser(result.userInfo)
-              uni.switchTab({
-                url: '/pages/index/index'
-              })
-              return
-            }
-          }
-          
-          // 微信未绑定，跳转到登录页
+    redirectToLogin(reason = '') {
+      if (reason) {
+        console.warn('启动页跳转登录：', reason)
+      }
+
+      uni.redirectTo({
+        url: '/pages/login/index'
+      })
+    },
+    goToHome() {
+      return goHomeByRole(useUserStore().role || uni.getStorageSync('user')?.role)
+    },
+    async checkLogin() {
+      try {
+        const userStore = useUserStore()
+        const storedUser = uni.getStorageSync('user')
+
+        if (userStore.manuallyLoggedOut || storedUser?.manuallyLoggedOut) {
           uni.redirectTo({
             url: '/pages/login/index'
           })
-          
-        } catch (e) {
-          console.error('登录检查失败:', e)
-          // 发生错误，跳转到登录页
-          uni.redirectTo({
-            url: '/pages/login/index'
-          })
+          return
         }
+
+        if (userStore.hasSession || userStore.restoreUser(storedUser)) {
+          this.goToHome()
+          return
+        }
+
+        const loginRes = await Promise.race([
+          uni.login({
+            provider: 'weixin'
+          }),
+          this.createTimeoutPromise('微信登录超时，请检查网络后重试')
+        ])
+
+        if (loginRes.errMsg === 'login:ok') {
+          const { result } = await Promise.race([
+            uniCloud.callFunction({
+              name: 'checkBind',
+              data: {
+                code: loginRes.code
+              }
+            }),
+            this.createTimeoutPromise('绑定校验超时，请稍后重试')
+          ])
+
+          if (result && result.success && result.isBound) {
+            userStore.setUser(result.userInfo)
+            this.goToHome()
+            return
+          }
+        }
+
+        this.redirectToLogin('未绑定或自动识别失败')
+      } catch (e) {
+        console.error('登录检查失败', e)
+
+        const userStore = useUserStore()
+        const fallbackUser = uni.getStorageSync('user')
+        if (userStore.restoreUser(fallbackUser)) {
+          this.goToHome()
+          return
+        }
+
+        this.redirectToLogin(e?.message || '启动检查异常')
       }
     }
   }
+}
 </script>
 
 <style lang="scss" scoped>
-  .splash-container {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40rpx;
-    box-sizing: border-box;
+.splash-container {
+  min-height: 100vh;
+  padding: 88rpx 40rpx 56rpx;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.56), transparent 20%),
+    radial-gradient(circle at 84% 12%, rgba(135, 194, 255, 0.36), transparent 22%),
+    linear-gradient(180deg, #d7e9ff 0%, #ebf3ff 46%, #f8fbff 100%);
+}
+
+.halo {
+  position: absolute;
+  border-radius: 999rpx;
+  filter: blur(12rpx);
+}
+
+.halo-left {
+  width: 320rpx;
+  height: 320rpx;
+  left: -100rpx;
+  top: 260rpx;
+  background: rgba(20, 91, 215, 0.12);
+}
+
+.halo-right {
+  width: 260rpx;
+  height: 260rpx;
+  right: -80rpx;
+  bottom: 240rpx;
+  background: rgba(245, 180, 71, 0.12);
+}
+
+.brand-block,
+.status-card,
+.version-chip {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 44rpx;
+}
+
+.brand-mark {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 42rpx;
+  background: linear-gradient(145deg, #145bd7 0%, #5ba3ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 24rpx 42rpx rgba(20, 91, 215, 0.22);
+  margin-bottom: 30rpx;
+}
+
+.brand-mark-text {
+  font-size: 62rpx;
+  color: #fff;
+  font-weight: 700;
+}
+
+.brand-title {
+  display: block;
+  font-size: 52rpx;
+  line-height: 1.16;
+  font-weight: 700;
+  color: #143055;
+  margin-bottom: 16rpx;
+}
+
+.brand-subtitle {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #5e7694;
+}
+
+.status-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 30rpx;
+  padding: 30rpx;
+  box-shadow: 0 18rpx 48rpx rgba(27, 73, 145, 0.12);
+  border: 1rpx solid rgba(22, 119, 255, 0.08);
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-bottom: 12rpx;
+}
+
+.spinner {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(20, 91, 215, 0.16);
+  border-top-color: #145bd7;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
-  
-  .logo-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 80rpx;
+
+  to {
+    transform: rotate(360deg);
   }
-  
-  .logo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 32rpx;
-  }
-  
-  .logo-icon {
-    font-size: 120rpx;
-    margin-bottom: 24rpx;
-  }
-  
-  .logo-text {
-    font-size: 42rpx;
-    font-weight: 700;
-    color: #fff;
-    text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
-  }
-  
-  .slogan {
-    font-size: 28rpx;
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 500;
-  }
-  
-  .loading-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 80rpx;
-  }
-  
-  .loading-spinner {
-    width: 80rpx;
-    height: 80rpx;
-    border: 6rpx solid rgba(255, 255, 255, 0.3);
-    border-top: 6rpx solid #fff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 24rpx;
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  .loading-text {
-    font-size: 28rpx;
-    color: rgba(255, 255, 255, 0.9);
-  }
-  
-  .footer {
-    position: absolute;
-    bottom: 40rpx;
-    left: 0;
-    right: 0;
-    text-align: center;
-  }
-  
-  .version {
-    font-size: 24rpx;
-    color: rgba(255, 255, 255, 0.7);
-  }
+}
+
+.status-title {
+  font-size: 32rpx;
+  color: #213450;
+  font-weight: 600;
+}
+
+.status-desc {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #72839a;
+}
+
+.version-chip {
+  align-self: center;
+  margin-top: 28rpx;
+  height: 50rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.78);
+  color: #6580a4;
+  font-size: 22rpx;
+  display: flex;
+  align-items: center;
+}
 </style>

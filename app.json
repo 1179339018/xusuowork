@@ -1,0 +1,67 @@
+{
+  "pages": [
+    "unpackage/dist/dev/mp-weixin/pages/splash/index",
+    "unpackage/dist/dev/mp-weixin/pages/index/index",
+    "unpackage/dist/dev/mp-weixin/pages/input/index",
+    "unpackage/dist/dev/mp-weixin/pages/street/index",
+    "unpackage/dist/dev/mp-weixin/pages/community/index",
+    "unpackage/dist/dev/mp-weixin/pages/detail/index",
+    "unpackage/dist/dev/mp-weixin/pages/login/index",
+    "unpackage/dist/dev/mp-weixin/pages/mine/index",
+    "unpackage/dist/dev/mp-weixin/pages/admin/user-list",
+    "unpackage/dist/dev/mp-weixin/pages/share/index"
+  ],
+  "window": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "矛盾纠纷管理系统",
+    "navigationBarBackgroundColor": "#1677ff",
+    "backgroundColor": "#eef4ff"
+  },
+  "tabBar": {
+    "color": "#7A7E83",
+    "selectedColor": "#1677ff",
+    "borderStyle": "black",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "unpackage/dist/dev/mp-weixin/pages/index/index",
+        "iconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/home.png",
+        "selectedIconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/home-active.png",
+        "text": "首页"
+      },
+      {
+        "pagePath": "unpackage/dist/dev/mp-weixin/pages/community/index",
+        "iconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/task.png",
+        "selectedIconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/task-active.png",
+        "text": "我的任务"
+      },
+      {
+        "pagePath": "unpackage/dist/dev/mp-weixin/pages/input/index",
+        "iconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/add.png",
+        "selectedIconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/add-active.png",
+        "text": "录入"
+      },
+      {
+        "pagePath": "unpackage/dist/dev/mp-weixin/pages/street/index",
+        "iconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/street.png",
+        "selectedIconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/street-active.png",
+        "text": "街道"
+      },
+      {
+        "pagePath": "unpackage/dist/dev/mp-weixin/pages/mine/index",
+        "iconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/mine.png",
+        "selectedIconPath": "unpackage/dist/dev/mp-weixin/static/tabbar/mine-active.png",
+        "text": "我的"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于获取纠纷发生位置"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
+  "usingComponents": {}
+}

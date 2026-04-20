@@ -2,12 +2,14 @@
 
 const db = uniCloud.database()
 const dbCmd = db.command
+const { DISPUTE_STATUS, USER_ROLES, hasRole } = require('../common/app-constants')
 
 exports.main = async (event, context) => {
 	const { disputeId, communityId, remark, userInfo } = event
+	const requestOpenid = context.OPENID || context.openid || userInfo?.openid
 
 	// 输入验证
-	if (!disputeId || !communityId || !userInfo || !userInfo.openid) {
+	if (!disputeId || !communityId || !requestOpenid) {
 		return {
 			success: false,
 			error: '缺少必要参数'
@@ -17,10 +19,10 @@ exports.main = async (event, context) => {
 	try {
 		// 检查用户权限
 		const userRes = await db.collection('users').where({
-			openid: userInfo.openid
+			openid: requestOpenid
 		}).get()
 
-		if (userRes.data.length === 0 || userRes.data[0].role !== 'street') {
+		if (userRes.data.length === 0 || (!hasRole(userRes.data[0], USER_ROLES.STREET) && !hasRole(userRes.data[0], USER_ROLES.ADMIN))) {
 			return {
 				success: false,
 				error: '权限不足'
@@ -36,9 +38,17 @@ exports.main = async (event, context) => {
 			}
 		}
 
+		const dispute = disputeRes.data[0]
+		if (dispute.status !== DISPUTE_STATUS.PENDING_ASSIGN) {
+			return {
+				success: false,
+				error: '当前纠纷状态不允许重复分派'
+			}
+		}
+
 		// 更新纠纷状态
 		await db.collection('disputes').doc(disputeId).update({
-			status: '待回访',
+			status: DISPUTE_STATUS.PENDING_VISIT,
 			assign_community: communityId,
 			assign_time: new Date()
 		})
@@ -47,7 +57,7 @@ exports.main = async (event, context) => {
 		await db.collection('assignments').add({
 			dispute_id: disputeId,
 			community_id: communityId,
-			assign_user: userInfo.openid,
+			assign_user: requestOpenid,
 			remark: remark || '',
 			assign_time: new Date()
 		})
@@ -57,8 +67,8 @@ exports.main = async (event, context) => {
 			entity_id: disputeId,
 			entity_type: 'assignment',
 			action: 'assign',
-			user_id: userInfo.openid,
-			user_name: userInfo.name,
+			user_id: requestOpenid,
+			user_name: userRes.data[0].name || userInfo?.name || '',
 			details: {
 				community_id: communityId,
 				remark: remark

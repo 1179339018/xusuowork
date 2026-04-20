@@ -1,13 +1,7 @@
 'use strict';
 
 const db = uniCloud.database()
-const dbCmd = db.command
-
-// 微信小程序配置
-const WX_CONFIG = {
-	appid: 'wxcf7e4bb93311f1c0',
-	secret: 'd3dc942232745182cd0ffb4a71a0b28d'
-}
+const { getWxConfig } = require('../common/wechat-config')
 
 exports.main = async (event, context) => {
 	const { code, phone } = event
@@ -20,8 +14,9 @@ exports.main = async (event, context) => {
 	}
 	
 	try {
+		const wxConfig = getWxConfig()
 		// 调用微信接口获取 openid
-		const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${WX_CONFIG.appid}&secret=${WX_CONFIG.secret}&js_code=${code}&grant_type=authorization_code`
+		const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${wxConfig.appid}&secret=${wxConfig.secret}&js_code=${code}&grant_type=authorization_code`
 		const res = await uniCloud.httpclient.request(url, {
 			dataType: 'json'
 		})

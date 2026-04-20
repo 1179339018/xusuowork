@@ -1,173 +1,155 @@
 <template>
   <view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
-    <view class="header">
-      <view class="logo-wrapper">
-        <text class="logo-icon">⚖️</text>
+    <view class="ambient ambient-left"></view>
+    <view class="ambient ambient-right"></view>
+
+    <view class="hero">
+      <view class="hero-badge">基层矛盾纠纷协同平台</view>
+      <view class="hero-mark">
+        <text class="hero-mark-icon">衡</text>
       </view>
-      <text class="title">矛盾纠纷管理系统</text>
-      <text class="subtitle">欢迎登录</text>
+      <text class="hero-title">欢迎登录</text>
+      <text class="hero-subtitle">使用已授权手机号完成绑定，进入纠纷分派、跟进与回访流程。</text>
     </view>
-    
+
     <view class="form-card">
-      <view class="info-text">
-        <text>本系统仅限授权人员访问</text>
-        <text>请输入手机号进行登录</text>
+      <view class="card-header">
+        <text class="card-title">手机号验证</text>
+        <text class="card-desc">首次登录会将当前微信与账号绑定，后续可直接自动识别。</text>
       </view>
-      
-      <view class="input-group">
-        <input 
-          class="input" 
-          type="number" 
-          placeholder="请输入手机号" 
-          maxlength="11" 
-          v-model="phone"
-        />
+
+      <view class="field">
+        <text class="field-label">手机号码</text>
+        <view class="input-shell">
+          <text class="input-prefix">+86</text>
+          <input
+            v-model="phone"
+            class="input"
+            type="number"
+            maxlength="11"
+            placeholder="请输入 11 位手机号"
+          />
+        </view>
       </view>
-      
-      <button 
-        class="btn-primary btn-block" 
-        @click="handleLogin"
-        :loading="loading"
-      >
-        {{ loading ? '登录中...' : '登录' }}
+
+      <button class="submit-btn" @click="handleLogin" :loading="loading">
+        {{ loading ? '登录中...' : '登录并进入系统' }}
       </button>
-      
-      <view class="tips">
-        <text>首次登录将自动绑定当前微信</text>
+
+      <view class="trust-list">
+        <view class="trust-item">
+          <text class="trust-dot trust-blue"></text>
+          <text class="trust-text">仅限授权账号访问</text>
+        </view>
+        <view class="trust-item">
+          <text class="trust-dot trust-gold"></text>
+          <text class="trust-text">支持微信自动识别与账号绑定</text>
+        </view>
       </view>
     </view>
   </view>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
+import { getNavbarConfig } from '@/utils/navbar'
+import { goHomeByRole } from '@/utils/navigation'
 
 const userStore = useUserStore()
 const loading = ref(false)
 const phone = ref('')
 const safeAreaTop = ref(0)
 
-// 获取导航栏配置
-const getNavbarConfig = () => {
-  try {
-    // 获取系统信息
-    const systemInfo = uni.getSystemInfoSync()
-    
-    // 获取胶囊按钮位置信息
-    const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
-    
-    // 状态栏高度
-    const statusBarHeight = systemInfo.statusBarHeight || 0
-    
-    // 胶囊按钮高度
-    const menuButtonHeight = menuButtonInfo.height || 32
-    
-    // 胶囊按钮距离顶部的距离
-    const menuButtonTop = menuButtonInfo.top || 0
-    
-    // 计算导航栏总高度
-    // 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
-    const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
-    
-    // 计算内容区域距离顶部的安全距离
-    // 安全距离 = 状态栏高度 + 导航栏高度
-    const safeAreaTopValue = statusBarHeight + navbarHeight
-    
-    return {
-      statusBarHeight,
-      menuButtonHeight,
-      menuButtonTop,
-      navbarHeight,
-      safeAreaTop: safeAreaTopValue
-    }
-  } catch (error) {
-    console.error('获取导航栏配置失败:', error)
-    // 降级处理：使用默认值
-    return {
-      statusBarHeight: 44,
-      menuButtonHeight: 32,
-      menuButtonTop: 48,
-      navbarHeight: 88,
-      safeAreaTop: 132
-    }
-  }
-}
-
-// 初始化导航栏配置
 const initNavbar = () => {
   const config = getNavbarConfig()
   safeAreaTop.value = config.safeAreaTop
 }
 
-// 生命周期
 onMounted(() => {
   initNavbar()
-  // 监听页面显示事件
-  uni.$on('pageShow', () => {
-    initNavbar()
+  if (userStore.hasSession || userStore.restoreUser()) {
+    goHome()
+  }
+})
+
+onShow(() => {
+  initNavbar()
+})
+
+const createTimeoutPromise = (message, timeout = 30000) => {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), timeout)
   })
-})
+}
 
-// 页面卸载时移除监听
-onUnmounted(() => {
-  uni.$off('pageShow')
-})
+const goHome = () => {
+  return goHomeByRole(userStore.role)
+}
 
-// 手动登录（带手机号）
 const handleLogin = async () => {
-  if (phone.value && phone.value.length === 11) {
-    loading.value = true
-    try {
-      const loginRes = await uni.login({
+  if (!/^1\d{10}$/.test(phone.value)) {
+    uni.showToast({
+      title: '请输入正确的手机号',
+      icon: 'none'
+    })
+    return
+  }
+
+  loading.value = true
+
+  try {
+    const loginRes = await Promise.race([
+      uni.login({
         provider: 'weixin'
-      })
-      
-      if (loginRes.errMsg !== 'login:ok') {
-        throw new Error('微信登录失败')
-      }
-      
-      const { result } = await uniCloud.callFunction({
+      }),
+      createTimeoutPromise('微信登录超时，请检查网络后重试')
+    ])
+
+    if (loginRes.errMsg !== 'login:ok') {
+      throw new Error('微信登录失败')
+    }
+
+    const { result } = await Promise.race([
+      uniCloud.callFunction({
         name: 'login',
         data: {
           code: loginRes.code,
           phone: phone.value
         }
-      })
-      
-      if (!result.success) {
-        throw new Error(result.error || '登录失败')
-      }
-      
-      const userInfo = result.userInfo
-      userStore.setUser(userInfo)
-      
-      uni.showToast({
-        title: `欢迎回来，${userInfo.name || '用户'}`,
-        icon: 'success'
-      })
-      
-      setTimeout(() => {
-        uni.switchTab({
-          url: '/pages/index/index'
-        })
-      }, 1500)
-      
-    } catch (error) {
-      console.error(error)
-      uni.showModal({
-        title: '登录失败',
-        content: error.message || '请重试',
-        showCancel: false
-      })
-    } finally {
-      loading.value = false
+      }),
+      createTimeoutPromise('登录请求超时，请稍后重试')
+    ])
+
+    if (!result.success) {
+      throw new Error(result.error || '登录失败')
     }
-  } else {
+
+    const userInfo = result.userInfo
+    userStore.setUser(userInfo)
+
     uni.showToast({
-      title: '请输入正确的手机号',
-      icon: 'none'
+      title: `欢迎回来，${userInfo.name || '用户'}`,
+      icon: 'success'
     })
+
+    setTimeout(() => {
+      goHome()
+    }, 1200)
+  } catch (error) {
+    console.error(error)
+    const message = error.message || '请稍后重试'
+    const content = message.includes('超时')
+      ? `${message}\n当前可能是开发工具网络波动或云函数响应较慢，请稍后重试。`
+      : message
+    uni.showModal({
+      title: '登录失败',
+      content,
+      showCancel: false
+    })
+  } finally {
+    loading.value = false
   }
 }
 </script>
@@ -175,152 +157,206 @@ const handleLogin = async () => {
 <style lang="scss" scoped>
 .container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #1677ff, #4096ff);
-  padding: 20rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  padding: 40rpx 36rpx 64rpx;
+  box-sizing: border-box;
   position: relative;
   overflow: hidden;
-}
-
-.container:before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,.15) 0%, transparent 70%);
-  animation: rotate 20s linear infinite;
-}
-
-@keyframes rotate {
-  0% { transform: rotate(0); }
-  100% { transform: rotate(360deg); }
-}
-
-.header {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.58), transparent 22%),
+    radial-gradient(circle at 88% 12%, rgba(145, 199, 255, 0.38), transparent 24%),
+    linear-gradient(180deg, #d8e8ff 0%, #edf4ff 42%, #f8fbff 100%);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  margin-bottom: 80rpx;
-  position: relative;
-  z-index: 1;
+  justify-content: center;
 }
 
-.header .logo-wrapper {
-  width: 160rpx;
-  height: 160rpx;
-  background: rgba(255,255,255,.2);
-  -webkit-backdrop-filter: blur(10rpx);
-  backdrop-filter: blur(10rpx);
-  border-radius: 50%;
+.ambient {
+  position: absolute;
+  border-radius: 999rpx;
+  filter: blur(10rpx);
+  opacity: 0.75;
+}
+
+.ambient-left {
+  width: 320rpx;
+  height: 320rpx;
+  left: -120rpx;
+  top: 180rpx;
+  background: rgba(31, 110, 245, 0.12);
+}
+
+.ambient-right {
+  width: 260rpx;
+  height: 260rpx;
+  right: -80rpx;
+  bottom: 180rpx;
+  background: rgba(255, 196, 94, 0.14);
+}
+
+.hero {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 40rpx;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 52rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1rpx solid rgba(22, 119, 255, 0.14);
+  color: #2459b8;
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+  margin-bottom: 28rpx;
+}
+
+.hero-mark {
+  width: 132rpx;
+  height: 132rpx;
+  border-radius: 36rpx;
+  background: linear-gradient(145deg, #145bd7 0%, #5ba3ff 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 40rpx;
-  border: 3rpx solid rgba(255,255,255,.3);
-  box-shadow: 0 8rpx 32rpx rgba(0,0,0,.1);
+  box-shadow: 0 20rpx 40rpx rgba(20, 91, 215, 0.24);
+  margin-bottom: 30rpx;
 }
 
-.header .logo-icon {
-  font-size: 60rpx;
-  line-height: 1;
-}
-
-.header .title {
-  font-size: 44rpx;
-  font-weight: 700;
+.hero-mark-icon {
+  font-size: 58rpx;
   color: #fff;
-  margin-bottom: 16rpx;
-  text-shadow: 0 2rpx 8rpx rgba(0,0,0,.1);
+  font-weight: 700;
 }
 
-.header .subtitle {
+.hero-title {
+  display: block;
+  font-size: 52rpx;
+  line-height: 1.14;
+  color: #153158;
+  font-weight: 700;
+  margin-bottom: 16rpx;
+}
+
+.hero-subtitle {
+  display: block;
   font-size: 28rpx;
-  color: rgba(255,255,255,.9);
+  line-height: 1.7;
+  color: #58708f;
 }
 
 .form-card {
-  width: 100%;
-  background: rgba(255,255,255,.95);
-  -webkit-backdrop-filter: blur(20rpx);
-  backdrop-filter: blur(20rpx);
-  border-radius: var(--radius-xl);
-  padding: 48rpx 40rpx;
-  box-shadow: 0 20rpx 60rpx rgba(0,0,0,.15);
-  border: 1rpx solid rgba(255,255,255,.5);
   position: relative;
   z-index: 1;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 32rpx;
+  padding: 36rpx 30rpx 32rpx;
+  box-shadow: 0 18rpx 50rpx rgba(27, 73, 145, 0.12);
+  border: 1rpx solid rgba(22, 119, 255, 0.08);
 }
 
-.info-text {
-  text-align: center;
-  margin-bottom: 60rpx;
-  color: var(--text-secondary);
+.card-header {
+  margin-bottom: 32rpx;
+}
+
+.card-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1c2e47;
+  margin-bottom: 10rpx;
+}
+
+.card-desc {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #72839a;
+}
+
+.field {
+  margin-bottom: 28rpx;
+}
+
+.field-label {
+  display: block;
+  font-size: 25rpx;
+  color: #50627d;
+  margin-bottom: 14rpx;
+}
+
+.input-shell {
+  height: 100rpx;
   display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-  font-size: 28rpx;
-  line-height: 1.6;
+  align-items: center;
+  gap: 18rpx;
+  padding: 0 28rpx;
+  background: #f6f9ff;
+  border: 2rpx solid rgba(22, 119, 255, 0.08);
+  border-radius: 24rpx;
 }
 
-.input-group {
-  margin-bottom: 40rpx;
+.input-prefix {
+  font-size: 28rpx;
+  color: #2459b8;
+  font-weight: 600;
 }
 
 .input {
+  flex: 1;
+  height: 100%;
+  font-size: 30rpx;
+  color: #22334c;
+}
+
+.submit-btn {
   width: 100%;
-  height: 96rpx;
-  background: #f5f7fa;
-  border-radius: 48rpx;
-  padding: 0 40rpx;
-  font-size: 32rpx;
-  color: var(--text-primary);
-  border: 2rpx solid transparent;
-  transition: all 0.3s ease;
-}
-
-.input:focus {
-  background: #fff;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4rpx rgba(22,119,255,.1);
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  height: 94rpx;
+  line-height: 94rpx;
+  margin-top: 8rpx;
+  border-radius: 999rpx;
   color: #fff;
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 600;
-  height: 96rpx;
-  line-height: 96rpx;
-  border-radius: 48rpx;
-  box-shadow: 0 8rpx 24rpx rgba(22,119,255,.3);
-  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
+  box-shadow: 0 16rpx 28rpx rgba(20, 91, 215, 0.22);
+
+  &::after {
+    border: none;
+  }
 }
 
-.btn-primary:active {
-  transform: scale(0.98);
-  box-shadow: 0 4rpx 12rpx rgba(22,119,255,.2);
+.trust-list {
+  margin-top: 28rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
 }
 
-.btn-primary:after {
-  border: none;
+.trust-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 
-.btn-block {
-  width: 100%;
+.trust-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
 }
 
-.tips {
-  margin-top: 40rpx;
-  text-align: center;
+.trust-blue {
+  background: #1677ff;
 }
 
-.tips text {
+.trust-gold {
+  background: #f5b447;
+}
+
+.trust-text {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #6e7f95;
 }
 </style>

@@ -1,0 +1,102 @@
+[
+  {
+    "IndexName": "create_time_desc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "create_time",
+          "Direction": "-1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  },
+  {
+    "IndexName": "status_create_time_desc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "status",
+          "Direction": "1"
+        },
+        {
+          "Name": "create_time",
+          "Direction": "-1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  },
+  {
+    "IndexName": "assign_community_create_time_desc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "assign_community",
+          "Direction": "1"
+        },
+        {
+          "Name": "create_time",
+          "Direction": "-1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  },
+  {
+    "IndexName": "assign_community_status_create_time_desc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "assign_community",
+          "Direction": "1"
+        },
+        {
+          "Name": "status",
+          "Direction": "1"
+        },
+        {
+          "Name": "create_time",
+          "Direction": "-1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  },
+  {
+    "IndexName": "community_create_time_desc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "community",
+          "Direction": "1"
+        },
+        {
+          "Name": "create_time",
+          "Direction": "-1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  },
+  {
+    "IndexName": "community_status_create_time_desc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "community",
+          "Direction": "1"
+        },
+        {
+          "Name": "status",
+          "Direction": "1"
+        },
+        {
+          "Name": "create_time",
+          "Direction": "-1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  }
+]

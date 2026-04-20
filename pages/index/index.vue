@@ -1,1232 +1,1170 @@
 <template>
-	<view class="container" :style="{ paddingTop: safeAreaTop + 'px' }">
-		<!-- 派出所视图 -->
-		<view v-if="isPolice" class="police-view">
-			<view class="action-card">
-				<button class="btn-primary btn-large" @click="goToInput">
-					<text class="icon-plus">+</text>
-					<text>新增纠纷</text>
-				</button>
-			</view>
-			
-			<view class="stats-section">
-				<view class="stats-card">
-					<view class="stats-title">今日推送</view>
-					<view class="stats-value">{{statistics.todayNew}}</view>
-					<view class="stats-desc">条纠纷已推送至街道</view>
-				</view>
-				
-				<view v-if="statistics.pendingPolice > 0" class="stats-card highlight">
-					<view class="stats-title">待处理</view>
-					<view class="stats-value">{{statistics.pendingPolice}}</view>
-					<view class="stats-desc">条社区转办的纠纷</view>
-				</view>
-			</view>
-			
-			<view class="recent-list">
-				<view class="section-title">最近推送</view>
-				<view v-for="(item, index) in recentDisputes" :key="item._id" class="list-item fade-in" @click="goToDetail(item._id)">
-					<view class="item-header">
-						<text class="item-title">{{item.title}}</text>
-						<text class="tag tag-primary">{{item.source}}</text>
-					</view>
-					<view class="item-info">
-						<text class="item-time">{{formatTime(item.create_time)}}</text>
-						<text :class="['status-text', item.statusClass]">{{item.status}}</text>
-					</view>
-				</view>
-				<view v-if="recentDisputes.length === 0" class="empty">
-					<text class="empty-icon">📭</text>
-					<text class="empty-text">暂无推送记录</text>
-				</view>
-			</view>
-		</view>
-		
-		<!-- 街道视图 -->
-		<view v-else-if="isStreet" class="street-view">
-			<view class="stats-grid">
-				<view class="stats-card">
-					<view class="stats-title">待分派</view>
-					<view class="stats-value">{{statistics.pendingAssign}}</view>
-				</view>
-				<view class="stats-card">
-					<view class="stats-title">已化解</view>
-					<view class="stats-value">{{statistics.resolved}}</view>
-				</view>
-				<view class="stats-card">
-					<view class="stats-title">化解率</view>
-					<view class="stats-value">{{statistics.resolveRate}}%</view>
-				</view>
-			</view>
-			
-			<view class="action-card">
-				<button class="btn-primary" @click="goToStreetManage">
-					<text>管理纠纷</text>
-				</button>
-			</view>
-			
-			<view class="recent-list">
-				<view class="section-title">待分派纠纷</view>
-				<view v-for="(item, index) in recentDisputes" :key="item._id" class="list-item fade-in" @click="goToDetail(item._id)">
-					<view class="item-header">
-						<text class="item-title">{{item.title}}</text>
-						<text class="tag tag-danger" v-if="item.urgency === '特急'">特急</text>
-						<text class="tag tag-warning" v-else-if="item.urgency === '紧急'">紧急</text>
-					</view>
-					<view class="item-info">
-						<text class="item-time">{{formatTime(item.create_time)}}</text>
-						<text class="status-text pending">{{item.status}}</text>
-					</view>
-				</view>
-				<view v-if="recentDisputes.length === 0" class="empty">
-					<text class="empty-icon">✅</text>
-					<text class="empty-text">暂无待分派纠纷</text>
-				</view>
-			</view>
-		</view>
-		
-		<!-- 社区视图 -->
-		<view v-else-if="isCommunity" class="community-view">
-			<view class="stats-section">
-				<view class="stats-card">
-					<view class="stats-title">待回访</view>
-					<view class="stats-value">{{statistics.pendingVisit}}</view>
-					<view class="stats-desc">条任务需要回访</view>
-				</view>
-			</view>
-			
-			<view class="recent-list">
-				<view class="section-title">最近任务</view>
-				<view v-for="(item, index) in recentDisputes" :key="item._id" class="list-item fade-in" @click="goToDetail(item._id)">
-					<view class="item-header">
-						<text class="item-title">{{item.title}}</text>
-						<text class="tag tag-primary">{{item.status}}</text>
-					</view>
-					<view class="item-info">
-						<text class="item-time">{{formatTime(item.assign_time || item.create_time)}}</text>
-						<text class="item-from">来自：{{item.source}}</text>
-					</view>
-				</view>
-				<view v-if="recentDisputes.length === 0" class="empty">
-					<text class="empty-icon">😌</text>
-					<text class="empty-text">暂无任务</text>
-				</view>
-			</view>
-		</view>
-		
-		<!-- 管理员视图 -->
-		<view v-else-if="isAdmin" class="admin-view">
-			<view class="stats-grid">
-				<view class="stats-card">
-					<view class="stats-title">纠纷总数</view>
-					<view class="stats-value">{{statistics.totalCount}}</view>
-				</view>
-				<view class="stats-card">
-					<view class="stats-title">已化解</view>
-					<view class="stats-value">{{statistics.resolved}}</view>
-				</view>
-				<view class="stats-card">
-					<view class="stats-title">用户数</view>
-					<view class="stats-value">{{statistics.userCount}}</view>
-				</view>
-			</view>
-			
-			<view class="admin-actions">
-				<view class="action-grid">
-					<view class="action-item" @click="goToUserManage">
-						<view class="action-icon">👥</view>
-						<view class="action-text">用户管理</view>
-					</view>
-					<view class="action-item" @click="goToStreetManage">
-						<view class="action-icon">📋</view>
-						<view class="action-text">纠纷管理</view>
-					</view>
-					<view class="action-item" @click="exportData">
-						<view class="action-icon">📊</view>
-						<view class="action-text">数据导出</view>
-					</view>
-				</view>
-			</view>
-			
-			<view class="export-section">
-				<view class="section-title">数据导出</view>
-				<view class="export-form">
-					<view class="form-row">
-								<text class="form-label">状态筛选</text>
-								<picker mode="selector" :range="statusOptions" :value="statusIndex" @change="onStatusChange">
-									<view class="picker-input">
-										<text>{{statusOptions[statusIndex]}}</text>
-										<text class="arrow">›</text>
-									</view>
-								</picker>
-							</view>
-							<view class="form-row">
-								<text class="form-label">社区筛选</text>
-								<picker mode="selector" :range="communityOptions" :value="communityIndex" @change="onCommunityChange">
-									<view class="picker-input">
-										<text>{{communityOptions[communityIndex]}}</text>
-										<text class="arrow">›</text>
-									</view>
-								</picker>
-							</view>
-							<view class="form-row">
-								<text class="form-label">风险程度</text>
-								<picker mode="selector" :range="riskLevelOptions" :value="riskLevelIndex" @change="onRiskLevelChange">
-									<view class="picker-input">
-										<text>{{riskLevelOptions[riskLevelIndex]}}</text>
-										<text class="arrow">›</text>
-									</view>
-								</picker>
-							</view>
-							<view class="form-row">
-								<text class="form-label">开始日期</text>
-								<picker mode="date" @change="onStartDateChange">
-									<view class="picker-input">
-										<text>{{startDate || '请选择'}}</text>
-										<text class="arrow">›</text>
-									</view>
-								</picker>
-							</view>
-					<view class="form-row">
-						<text class="form-label">结束日期</text>
-						<picker mode="date" @change="onEndDateChange">
-							<view class="picker-input">
-								<text>{{endDate || '请选择'}}</text>
-								<text class="arrow">›</text>
-							</view>
-						</picker>
-					</view>
-					<view class="form-actions">
-						<button class="btn-primary btn-export" @click="exportData">导出数据</button>
-						<button class="btn-secondary" @click="resetForm">重置</button>
-					</view>
-				</view>
-			</view>
-		</view>
-		
-		<!-- 无角色提示 -->
-		<view v-else-if="userInfo" class="no-role-view">
-			<view class="empty">
-				<text class="empty-icon">⚠️</text>
-				<text class="empty-text">您还没有分配角色</text>
-				<text class="empty-subtext">请联系管理员分配角色</text>
-			</view>
-		</view>
-		
-		<!-- 未登录提示 -->
-		<view v-else class="not-login-view">
-			<view class="empty">
-				<text class="empty-icon">🔐</text>
-				<text class="empty-text">请先登录</text>
-				<navigator url="/pages/login/index" class="login-btn">去登录</navigator>
-			</view>
-		</view>
-	</view>
+  <view class="home-page" :style="{ paddingTop: `${safeAreaTop + 12}px` }">
+    <view v-if="userStore.isLogin && !isAdmin" class="hero-card">
+      <view class="hero-copy">
+        <text class="hero-kicker">纠纷协同工作台</text>
+        <text class="hero-title">{{ heroTitle }}</text>
+        <text class="hero-desc">{{ heroDesc }}</text>
+      </view>
+      <view class="hero-side">
+        <text class="hero-role">{{ userStore.role || '未登录' }}</text>
+        <text class="hero-meta">{{ recentDisputes.length }} 条最近动态</text>
+      </view>
+    </view>
+
+    <view v-if="isPolice" class="page-section">
+      <view class="action-card">
+        <button class="btn-primary btn-large" @click="goToInput">新增纠纷</button>
+      </view>
+
+      <view class="quick-grid">
+        <view class="quick-item" @click="goToInput">
+          <image class="quick-icon" src="/static/icons/icon-add.svg" mode="aspectFit" />
+          <text class="quick-title">快速录入</text>
+          <text class="quick-desc">直接进入纠纷录入页</text>
+        </view>
+        <view class="quick-item" @click="goToDetailList">
+          <image class="quick-icon" src="/static/icons/mine-task-manage.svg" mode="aspectFit" />
+          <text class="quick-title">我的任务</text>
+          <text class="quick-desc">查看录入后的处理进度</text>
+        </view>
+      </view>
+
+      <view class="stats-grid single-column">
+        <view class="stats-card">
+          <text class="stats-label">今日上报</text>
+          <text class="stats-value">{{ statistics.todayNew }}</text>
+          <text class="stats-desc">今日已上报到街道的纠纷数量</text>
+        </view>
+        <view class="stats-card accent">
+          <text class="stats-label">累计上报</text>
+          <text class="stats-value">{{ statistics.totalCount }}</text>
+          <text class="stats-desc">当前账号录入的全部纠纷</text>
+        </view>
+      </view>
+
+      <view class="panel-card">
+        <view class="panel-head">
+          <text class="panel-title">最近上报</text>
+          <text class="panel-meta">{{ recentDisputes.length }} 条</text>
+        </view>
+
+        <view v-if="recentDisputes.length > 0" class="list-stack">
+          <view
+            v-for="item in recentDisputes"
+            :key="item._id"
+            class="list-item"
+            @click="goToDetail(item._id)"
+          >
+            <view class="item-top">
+              <text class="item-title">{{ item.title || '未命名纠纷' }}</text>
+              <text class="status-chip" :class="item.statusClass">{{ item.status || '状态未知' }}</text>
+            </view>
+            <view class="item-bottom">
+              <text class="item-sub">{{ item.source || '未填写来源' }}</text>
+              <text class="item-time">{{ formatDateTime(item.create_time) }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-else class="empty-state">
+          <view class="empty-mark"></view>
+          <text class="empty-text">暂无上报记录</text>
+          <text class="empty-desc">可以先新增一条纠纷，系统会自动进入后续分派和跟进流程。</text>
+          <button class="btn-primary empty-btn" @click="goToInput">立即录入</button>
+        </view>
+      </view>
+    </view>
+
+    <view v-else-if="isStreet" class="page-section">
+      <view class="stats-grid three-column">
+        <view class="stats-card">
+          <text class="stats-label">待分派</text>
+          <text class="stats-value">{{ statistics.pendingAssign }}</text>
+        </view>
+        <view class="stats-card">
+          <text class="stats-label">处理中</text>
+          <text class="stats-value">{{ statistics.processing }}</text>
+        </view>
+        <view class="stats-card accent">
+          <text class="stats-label">已化解</text>
+          <text class="stats-value">{{ statistics.resolved }}</text>
+        </view>
+      </view>
+
+      <view class="action-card compact">
+        <button class="btn-primary" @click="goToStreetManage">进入街道管理</button>
+      </view>
+
+      <view class="panel-card">
+        <view class="panel-head">
+          <text class="panel-title">待分派纠纷</text>
+          <text class="panel-meta">优先处理紧急项</text>
+        </view>
+
+        <view v-if="recentDisputes.length > 0" class="list-stack">
+          <view
+            v-for="item in recentDisputes"
+            :key="item._id"
+            class="list-item"
+            @click="goToDetail(item._id)"
+          >
+            <view class="item-top">
+              <text class="item-title">{{ item.title || '未命名纠纷' }}</text>
+              <text class="urgency-chip" :class="getUrgencyClass(item.urgency)">{{ item.urgency || '一般' }}</text>
+            </view>
+            <view class="item-bottom">
+              <text class="item-sub">{{ item.location?.address || '位置待补充' }}</text>
+              <text class="item-time">{{ formatDateTime(item.create_time) }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-else class="empty-state">
+          <view class="empty-mark"></view>
+          <text class="empty-text">暂无待分派纠纷</text>
+          <text class="empty-desc">当前没有新的待分派事项，可以进入街道管理查看全部任务。</text>
+          <button class="btn-secondary empty-btn" @click="goToStreetManage">查看全部任务</button>
+        </view>
+      </view>
+    </view>
+
+    <view v-else-if="isCommunity" class="page-section">
+      <view class="stats-grid two-column">
+        <view class="stats-card">
+          <text class="stats-label">待回访</text>
+          <text class="stats-value">{{ statistics.pendingVisit }}</text>
+          <text class="stats-desc">优先处理未回访任务</text>
+        </view>
+        <view class="stats-card accent">
+          <text class="stats-label">处理中</text>
+          <text class="stats-value">{{ statistics.processing }}</text>
+          <text class="stats-desc">持续跟进中的任务</text>
+        </view>
+      </view>
+
+      <view class="panel-card">
+        <view class="panel-head">
+          <text class="panel-title">最近任务</text>
+          <text class="panel-meta">{{ userStore.community || '社区任务' }}</text>
+        </view>
+
+        <view v-if="recentDisputes.length > 0" class="list-stack">
+          <view
+            v-for="item in recentDisputes"
+            :key="item._id"
+            class="list-item"
+            @click="goToDetail(item._id)"
+          >
+            <view class="item-top">
+              <text class="item-title">{{ item.title || '未命名纠纷' }}</text>
+              <text class="status-chip" :class="item.statusClass">{{ item.status || '状态未知' }}</text>
+            </view>
+            <view class="item-bottom">
+              <text class="item-sub">{{ item.source || '未填写来源' }}</text>
+              <text class="item-time">{{ formatDateTime(item.assign_time || item.create_time) }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-else class="empty-state">
+          <view class="empty-mark"></view>
+          <text class="empty-text">暂无社区任务</text>
+          <text class="empty-desc">当前没有分派到本社区的事项，可以稍后下拉刷新查看最新任务。</text>
+          <button class="btn-secondary empty-btn" @click="goToDetailList">进入任务页</button>
+        </view>
+      </view>
+    </view>
+
+    <view v-else-if="isAdmin" class="page-section">
+      <view class="stats-grid three-column">
+        <view class="stats-card">
+          <text class="stats-label">纠纷总数</text>
+          <text class="stats-value">{{ statistics.totalCount }}</text>
+        </view>
+        <view class="stats-card">
+          <text class="stats-label">已化解</text>
+          <text class="stats-value">{{ statistics.resolved }}</text>
+        </view>
+        <view class="stats-card accent">
+          <text class="stats-label">用户数</text>
+          <text class="stats-value">{{ statistics.userCount }}</text>
+        </view>
+      </view>
+
+      <view class="action-grid">
+        <view class="action-item" @click="goToUserManage">
+          <image class="action-icon" src="/static/icons/mine-user-manage.svg" mode="aspectFit" />
+          <text class="action-title">用户管理</text>
+          <text class="action-desc">查看账号和角色配置</text>
+        </view>
+        <view class="action-item" @click="goToStreetManage">
+          <image class="action-icon" src="/static/icons/mine-task-manage.svg" mode="aspectFit" />
+          <text class="action-title">纠纷管理</text>
+          <text class="action-desc">进入任务列表进行分派与跟进</text>
+        </view>
+        <view class="action-item" @click="exportData">
+          <image class="action-icon" src="/static/icons/icon-edit.svg" mode="aspectFit" />
+          <text class="action-title">数据导出</text>
+          <text class="action-desc">按筛选条件导出 CSV</text>
+        </view>
+      </view>
+
+      <view class="panel-card">
+        <view class="panel-head">
+          <text class="panel-title">导出筛选</text>
+          <text class="panel-meta">支持状态、社区、紧急程度与日期</text>
+        </view>
+
+        <view class="filter-grid">
+          <view class="form-row">
+            <text class="form-label">状态</text>
+            <picker mode="selector" :range="statusOptions" :value="statusIndex" @change="onStatusChange">
+              <view class="picker-shell">
+                <text>{{ statusOptions[statusIndex] }}</text>
+                <image class="picker-arrow" src="/static/icons/icon-arrow.svg" mode="aspectFit" />
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row">
+            <text class="form-label">社区</text>
+            <picker mode="selector" :range="communityOptions" :value="communityIndex" @change="onCommunityChange">
+              <view class="picker-shell">
+                <text>{{ communityOptions[communityIndex] }}</text>
+                <image class="picker-arrow" src="/static/icons/icon-arrow.svg" mode="aspectFit" />
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row">
+            <text class="form-label">紧急程度</text>
+            <picker mode="selector" :range="riskLevelOptions" :value="riskLevelIndex" @change="onRiskLevelChange">
+              <view class="picker-shell">
+                <text>{{ riskLevelOptions[riskLevelIndex] }}</text>
+                <image class="picker-arrow" src="/static/icons/icon-arrow.svg" mode="aspectFit" />
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row">
+            <text class="form-label">开始日期</text>
+            <picker mode="date" @change="onStartDateChange">
+              <view class="picker-shell">
+                <text>{{ startDate || '请选择' }}</text>
+                <image class="picker-arrow" src="/static/icons/icon-arrow.svg" mode="aspectFit" />
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row">
+            <text class="form-label">结束日期</text>
+            <picker mode="date" @change="onEndDateChange">
+              <view class="picker-shell">
+                <text>{{ endDate || '请选择' }}</text>
+                <image class="picker-arrow" src="/static/icons/icon-arrow.svg" mode="aspectFit" />
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="filter-actions">
+          <button class="btn-primary" @click="exportData">导出数据</button>
+          <button class="btn-secondary" @click="resetForm">重置筛选</button>
+        </view>
+      </view>
+    </view>
+
+    <view v-else-if="userStore.isLogin" class="empty-wrap">
+      <view class="empty-state">
+        <view class="empty-mark"></view>
+        <text class="empty-text">当前账号尚未分配角色</text>
+        <text class="empty-desc">请联系管理员分配角色后，再进入对应工作台处理纠纷事项。</text>
+      </view>
+    </view>
+
+    <view v-else class="empty-wrap">
+      <view class="empty-state">
+        <view class="empty-mark"></view>
+        <text class="empty-text">请先登录后进入首页</text>
+        <text class="empty-desc">登录后系统会根据你的角色自动展示对应首页视图。</text>
+        <navigator url="/pages/login/index" class="login-link">去登录</navigator>
+      </view>
+    </view>
+  </view>
 </template>
 
-<script>
-	import { ref, computed, onMounted, onUnmounted } from 'vue'
-	import { useUserStore } from '@/store/user'
-	import { useDisputeStore } from '@/store/dispute'
-	
-	export default {
-		setup() {
-				const userStore = useUserStore()
-				const disputeStore = useDisputeStore()
-				
-				const isLoading = ref(false)
-				const statistics = ref({
-					todayNew: 0,
-					pendingAssign: 0,
-					pendingVisit: 0,
-					pendingPolice: 0,
-					resolved: 0,
-					resolveRate: '0.0',
-					totalCount: 0,
-					userCount: 0
-				})
-				const recentDisputes = ref([])
-				const startDate = ref('')
-				const endDate = ref('')
-				const statusOptions = ['全部', '待分派', '待回访', '处理中', '已化解', '已关闭']
-				const statusIndex = ref(0)
-				const communityOptions = ['全部', '光大街社区', '大来井社区', '核桃湾社区', '火井沱社区', '大湾井社区', '马吃水社区', '芭蕉冲社区', '其他']
-				const communityIndex = ref(0)
-				const riskLevelOptions = ['全部', '低风险', '中风险', '高风险']
-				const riskLevelIndex = ref(0)
-				const safeAreaTop = ref(0)
-				
-				// 获取导航栏配置
-				const getNavbarConfig = () => {
-					try {
-						// 获取系统信息
-						const systemInfo = uni.getSystemInfoSync()
-						
-						// 获取胶囊按钮位置信息
-						const menuButtonInfo = uni.getMenuButtonBoundingClientRect()
-						
-						// 状态栏高度
-						const statusBarHeight = systemInfo.statusBarHeight || 0
-						
-						// 胶囊按钮高度
-						const menuButtonHeight = menuButtonInfo.height || 32
-						
-						// 胶囊按钮距离顶部的距离
-						const menuButtonTop = menuButtonInfo.top || 0
-						
-						// 计算导航栏总高度
-						// 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
-						const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2
-						
-						// 计算内容区域距离顶部的安全距离
-						// 安全距离 = 状态栏高度 + 导航栏高度
-						const safeAreaTopValue = statusBarHeight + navbarHeight
-						
-						return {
-							statusBarHeight,
-							menuButtonHeight,
-							menuButtonTop,
-							navbarHeight,
-							safeAreaTop: safeAreaTopValue
-						}
-					} catch (error) {
-						console.error('获取导航栏配置失败:', error)
-						// 降级处理：使用默认值
-						return {
-							statusBarHeight: 44,
-							menuButtonHeight: 32,
-							menuButtonTop: 48,
-							navbarHeight: 88,
-							safeAreaTop: 132
-						}
-					}
-				}
-				
-				// 初始化导航栏配置
-				const initNavbar = () => {
-					const config = getNavbarConfig()
-					safeAreaTop.value = config.safeAreaTop
-				}
-			
-			// 计算属性
-			const userInfo = computed(() => ({
-				_id: userStore._id,
-				openid: userStore.openid,
-				name: userStore.name,
-				phone: userStore.phone,
-				role: userStore.role,
-				authorized_roles: userStore.authorized_roles,
-				community: userStore.community,
-				avatar: userStore.avatar
-			}))
-			const isPolice = computed(() => userStore.role === '派出所')
-			const isStreet = computed(() => userStore.role === '街道')
-			const isCommunity = computed(() => userStore.role === '社区')
-			const isAdmin = computed(() => userStore.role === '管理员')
-			
-			// 方法
-			const goToInput = () => {
-				uni.navigateTo({
-					url: '/pages/input/index'
-				})
-			}
-			
-			const goToStreetManage = () => {
-				uni.switchTab({
-					url: '/pages/street/index'
-				})
-			}
-			
-			const goToDetail = (id) => {
-				uni.navigateTo({
-					url: `/pages/detail/index?id=${id}`
-				})
-			}
-			
-			const goToUserManage = () => {
-				uni.navigateTo({
-					url: '/pages/admin/user-list'
-				})
-			}
-			
-			const formatTime = (time) => {
-				if (!time) return ''
-				const date = new Date(time)
-				return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-			}
-			
-			const onStartDateChange = (e) => {
-				startDate.value = e.detail.value
-				if (endDate.value && endDate.value < startDate.value) {
-					endDate.value = ''
-				}
-			}
-			
-			const onEndDateChange = (e) => {
-				endDate.value = e.detail.value
-				if (startDate.value && endDate.value < startDate.value) {
-					const temp = startDate.value
-					startDate.value = endDate.value
-					endDate.value = temp
-				}
-			}
-			
-			const onStatusChange = (e) => {
-				statusIndex.value = Number(e.detail.value) || 0
-			}
-			
-			const onCommunityChange = (e) => {
-				communityIndex.value = Number(e.detail.value) || 0
-			}
-			
-			const onRiskLevelChange = (e) => {
-				riskLevelIndex.value = Number(e.detail.value) || 0
-			}
-			
-			const resetForm = () => {
-				startDate.value = ''
-				endDate.value = ''
-			}
-			
-			const exportData = async () => {
-				if (!userStore.isAdmin) return
-				
-				try {
-					uni.showLoading({
-						title: '正在导出...'
-					})
-					
-					const pageSize = 100
-					let page = 1
-					const allData = []
-					const status = statusOptions[statusIndex.value]
-					const statusFilter = status === '全部' ? '' : status
-					
-					// 分批获取数据
-					while (true) {
-						const res = await uniCloud.callFunction({
-							name: 'getDisputeList',
-							data: {
-								role: userStore.role,
-								community: userStore.community,
-								status: statusFilter,
-								startDate: startDate.value,
-								endDate: endDate.value,
-								page: page,
-								pageSize: pageSize,
-								needTotal: false
-							}
-						})
-						
-						if (!res.result || !res.result.success) {
-							throw new Error('获取数据失败')
-						}
-						
-						const data = res.result.data || []
-						allData.push(...data)
-						
-						if (!res.result.hasMore || data.length < pageSize) {
-							break
-						}
-						
-						page++
-					}
-					
-					if (allData.length === 0) {
-						uni.hideLoading()
-						uni.showToast({
-							title: '暂无数据可导出',
-							icon: 'none'
-						})
-						return
-					}
-					
-					// 生成CSV
-					const headers = ['纠纷ID', '标题', '来源', '状态', '紧急度', '发生次数', '涉及人员', '地址', '创建时间', '分派社区ID', '分派时间']
-					const rows = allData.map(item => {
-						const createTime = item.create_time ? new Date(item.create_time) : null
-						const assignTime = item.assign_time ? new Date(item.assign_time) : null
-						
-						const formatDate = (date) => {
-							if (!date) return ''
-							return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
-						}
-						
-						const formatNumber = (num) => {
-							if (num == null) return ''
-							return String(num)
-						}
-						
-						return [
-							item._id || '',
-							`"${item.title || ''}"`,
-							item.source || '',
-							item.status || '',
-							item.urgency || '',
-							formatNumber(item.occur_count || 1),
-							`"${item.parties || ''}"`,
-							`"${item.location?.address || ''}"`,
-							formatDate(createTime),
-							item.assign_community_id || '',
-							formatDate(assignTime)
-						]
-					})
-					
-					const csvContent = [
-						headers.join(','),
-						...rows.map(row => row.join(','))
-					].join('\n')
-					
-					// 导出文件
-					const fileName = `纠纷数据_${new Date().toISOString().split('T')[0]}.csv`
-					
-					if (uni.saveFile) {
-							// 小程序环境
-							const tempFilePath = `${wx.env.USER_DATA_PATH}/${fileName}`
-							const fs = wx.getFileSystemManager()
-							fs.writeFile({
-								filePath: tempFilePath,
-								data: csvContent,
-								encoding: 'utf8',
-								success: (res) => {
-									uni.hideLoading()
-									uni.showToast({
-										title: '导出成功',
-										icon: 'success'
-									})
-									
-									// 打开文件
-									wx.openDocument({
-										filePath: tempFilePath,
-										success: (res) => {
-											// 导出成功后显示操作菜单，包含转发到微信的选项
-											uni.showActionSheet({
-												itemList: ['转发到微信'],
-												success: (actionRes) => {
-													if (actionRes.tapIndex === 0) {
-														// 转发到微信
-														wx.shareFileMessage({
-															filePath: tempFilePath,
-															title: fileName,
-															success: (shareRes) => {
-																console.log('转发成功', shareRes)
-															},
-															fail: (shareErr) => {
-																console.error('转发失败', shareErr)
-																uni.showToast({
-																	title: '转发失败',
-																	icon: 'none'
-																})
-															}
-														})
-													}
-												}
-											})
-										}
-									})
-								},
-								fail: (err) => {
-									uni.hideLoading()
-									uni.showToast({
-										title: '导出失败',
-										icon: 'none'
-									})
-									console.error('导出失败', err)
-								}
-							})
-					} else {
-						// H5环境
-						const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-						const link = document.createElement('a')
-						const url = URL.createObjectURL(blob)
-						link.setAttribute('href', url)
-						link.setAttribute('download', fileName)
-						link.style.visibility = 'hidden'
-						document.body.appendChild(link)
-						link.click()
-						document.body.removeChild(link)
-						uni.hideLoading()
-						uni.showToast({
-							title: '导出成功',
-							icon: 'success'
-						})
-					}
-				} catch (error) {
-					uni.hideLoading()
-					uni.showToast({
-						title: '导出失败',
-						icon: 'none'
-					})
-					console.error('导出失败', error)
-				}
-			}
-			
-			const loadStatistics = async () => {
-				if (!userStore.isLogin) return
-				
-				try {
-					// 直接获取数据，不使用缓存，确保数据及时更新
-					const res = await uniCloud.callFunction({
-						name: 'getStatistics',
-						data: {
-							role: userStore.role,
-							community: userStore.community
-						}
-					})
-					
-					if (res.result && res.result.success) {
-						statistics.value = {
-							...statistics.value,
-							...res.result.data
-						}
-					}
-				} catch (error) {
-					console.error('获取统计数据失败', error)
-				}
-			}
-			
-			const loadRecentDisputes = async () => {
-				if (!userStore.isLogin) return
-				
-				try {
-					// 检查缓存
-					const cacheKey = `recent_${userStore.role}_${userStore.community || 'all'}`
-					const cachedData = uni.getStorageSync(cacheKey)
-					const cacheTime = uni.getStorageSync(`${cacheKey}_time`)
-					
-					// 如果缓存存在且未过期（2分钟）
-					if (cachedData && cacheTime && Date.now() - cacheTime < 2 * 60 * 1000) {
-						recentDisputes.value = cachedData
-						return
-					}
-					
-					const res = await uniCloud.callFunction({
-						name: 'getDisputeList',
-						data: {
-							role: userStore.role,
-							community: userStore.community,
-							page: 1,
-							pageSize: 10,
-							needTotal: false
-						}
-					})
-					
-					if (res.result && res.result.success) {
-						const processedData = (res.result.data || []).map(item => ({
-							...item,
-							statusClass: {
-								'待分派': 'pending',
-								'待回访': 'pending',
-								'处理中': 'processing',
-								'已化解': 'resolved',
-								'已关闭': 'closed'
-							}[item.status] || ''
-						}))
-						recentDisputes.value = processedData
-						
-						// 缓存数据
-						uni.setStorageSync(cacheKey, processedData)
-						uni.setStorageSync(`${cacheKey}_time`, Date.now())
-					}
-				} catch (error) {
-					console.error('获取最近纠纷失败', error)
-				}
-			}
-			
-			// 检查登录状态
-			const checkLogin = () => {
-				// 检查用户是否已登录，或者是否有存储的用户信息
-				if (!userStore.isLogin && !userStore.openid) {
-					uni.redirectTo({
-						url: '/pages/login/index'
-					})
-					return false
-				}
-				return true
-			}
-			
-			// 生命周期
-			onMounted(async () => {
-				initNavbar()
-				
-				// 延迟一下，等待 Pinia 完成状态恢复
-				setTimeout(() => {
-					if (checkLogin()) {
-						// 并行执行数据获取，减少加载时间
-						try {
-							isLoading.value = true
-							Promise.all([
-								loadStatistics(),
-								loadRecentDisputes()
-							]).finally(() => {
-								isLoading.value = false
-							})
-						} catch (error) {
-							isLoading.value = false
-							console.error('数据加载失败:', error)
-						}
-					}
-				}, 100)
-			})
-			
-			// 页面显示时重新计算（防止横屏切换等情况）
-			onMounted(() => {
-				// 监听页面显示事件
-				uni.$on('pageShow', () => {
-					initNavbar()
-				})
-			})
-			
-			// 页面卸载时移除监听
-			onUnmounted(() => {
-				uni.$off('pageShow')
-			})
-			
-			// 下拉刷新
-			const onPullDownRefresh = async () => {
-				if (checkLogin()) {
-					try {
-						await Promise.all([
-							loadStatistics(),
-							loadRecentDisputes()
-						])
-					} finally {
-						uni.stopPullDownRefresh()
-					}
-				}
-			}
-			
-			return {
-				userInfo,
-				isPolice,
-				isStreet,
-				isCommunity,
-				isAdmin,
-				isLoading,
-				statistics,
-				recentDisputes,
-				startDate,
-				endDate,
-				statusOptions,
-				statusIndex,
-				communityOptions,
-				communityIndex,
-				riskLevelOptions,
-				riskLevelIndex,
-				safeAreaTop,
-				goToInput,
-				goToStreetManage,
-				goToDetail,
-				goToUserManage,
-				formatTime,
-				onStartDateChange,
-				onEndDateChange,
-				onStatusChange,
-				resetForm,
-				exportData,
-				onPullDownRefresh
-			}
-		}
-	}
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { useUserStore } from '@/store/user'
+import { getNavbarConfig } from '@/utils/navbar'
+import {
+  COMMUNITY_FILTER_OPTIONS,
+  DISPUTE_STATUS,
+  FILTER_ALL,
+  RISK_LEVEL_OPTIONS,
+  STATUS_CLASS_MAP,
+  STATUS_FILTER_OPTIONS,
+  URGENCY_TAG_CLASS_MAP,
+  USER_ROLES
+} from '@/utils/constants'
+import { getPageCache, getPageCacheDirtyAt, setPageCache } from '@/utils/page-cache'
+import { getStreetTabByRole, switchTabWithFallback } from '@/utils/navigation'
+
+const userStore = useUserStore()
+const safeAreaTop = ref(0)
+const statistics = ref({
+  todayNew: 0,
+  pendingAssign: 0,
+  pendingVisit: 0,
+  processing: 0,
+  resolved: 0,
+  totalCount: 0,
+  userCount: 0
+})
+const recentDisputes = ref([])
+const startDate = ref('')
+const endDate = ref('')
+const statusOptions = STATUS_FILTER_OPTIONS
+const communityOptions = COMMUNITY_FILTER_OPTIONS
+const riskLevelOptions = RISK_LEVEL_OPTIONS
+const statusIndex = ref(0)
+const communityIndex = ref(0)
+const riskLevelIndex = ref(0)
+const lastRefreshAt = ref(0)
+const isInitializing = ref(false)
+const hasInitialized = ref(false)
+const refreshingDashboard = ref(false)
+
+const STATS_CACHE_AGE = 60 * 1000
+const RECENT_CACHE_AGE = 90 * 1000
+const REFRESH_INTERVAL = 60 * 1000
+
+const isPolice = computed(() => userStore.role === USER_ROLES.POLICE)
+const isStreet = computed(() => userStore.role === USER_ROLES.STREET)
+const isCommunity = computed(() => userStore.role === USER_ROLES.COMMUNITY)
+const isAdmin = computed(() => userStore.role === USER_ROLES.ADMIN)
+
+const heroTitle = computed(() => {
+  if (isPolice.value) return '上报入口与进度总览'
+  if (isStreet.value) return '街道分派与跟进总览'
+  if (isCommunity.value) return '社区回访与处理总览'
+  if (isAdmin.value) return '管理员工作台'
+  return '欢迎进入纠纷管理系统'
+})
+
+const heroDesc = computed(() => {
+  if (isPolice.value) return '快速录入纠纷，并查看后续分派与处理动态。'
+  if (isStreet.value) return '优先查看待分派和处理中事项，减少漏派与积压。'
+  if (isCommunity.value) return '集中查看回访任务，及时更新处理结果和回访记录。'
+  if (isAdmin.value) return '统一查看用户、任务和处理进度，保持管理视图清晰。'
+  return '系统会根据角色展示对应工作台。'
+})
+
+const initNavbar = () => {
+  const config = getNavbarConfig()
+  safeAreaTop.value = config.safeAreaTop
+}
+
+const buildScopedKey = (scope) => {
+  const role = userStore.role || 'guest'
+  const community = userStore.community || 'all'
+  const openid = userStore.openid || 'anonymous'
+  return `home:${scope}:${role}:${community}:${openid}`
+}
+
+const getRecentQuery = () => {
+  if (isStreet.value) {
+    return { status: DISPUTE_STATUS.PENDING_ASSIGN }
+  }
+
+  if (isCommunity.value) {
+    return { status: DISPUTE_STATUS.PENDING_VISIT }
+  }
+
+  return {}
+}
+
+const mapDispute = (item) => ({
+  ...item,
+  statusClass: STATUS_CLASS_MAP[item.status] || '',
+  urgencyClass: URGENCY_TAG_CLASS_MAP[item.urgency] || 'tag-primary'
+})
+
+const hydrateCache = () => {
+  const cachedStats = getPageCache(buildScopedKey('stats'), STATS_CACHE_AGE)
+  const cachedRecent = getPageCache(buildScopedKey('recent'), RECENT_CACHE_AGE)
+
+  if (cachedStats) {
+    statistics.value = { ...statistics.value, ...cachedStats }
+  }
+
+  if (Array.isArray(cachedRecent)) {
+    recentDisputes.value = cachedRecent
+  }
+}
+
+const loadStatistics = async (force = false) => {
+  if (!userStore.isLogin) {
+    return
+  }
+
+  if (!force) {
+    const cachedStats = getPageCache(buildScopedKey('stats'), STATS_CACHE_AGE)
+    if (cachedStats) {
+      statistics.value = { ...statistics.value, ...cachedStats }
+    }
+  }
+
+  const { result } = await uniCloud.callFunction({
+    name: 'getStatistics',
+    data: {
+      role: userStore.role,
+      openid: userStore.openid,
+      community: userStore.community
+    }
+  })
+
+  if (!result?.success) {
+    throw new Error(result?.error || '统计加载失败')
+  }
+
+  statistics.value = {
+    ...statistics.value,
+    ...result.data
+  }
+  setPageCache(buildScopedKey('stats'), statistics.value)
+}
+
+const loadRecentDisputes = async (force = false) => {
+  if (!userStore.isLogin) {
+    return
+  }
+
+  if (!force) {
+    const cachedRecent = getPageCache(buildScopedKey('recent'), RECENT_CACHE_AGE)
+    if (Array.isArray(cachedRecent)) {
+      recentDisputes.value = cachedRecent
+    }
+  }
+
+  const { result } = await uniCloud.callFunction({
+    name: 'getDisputeList',
+    data: {
+      role: userStore.role,
+      openid: userStore.openid,
+      community: userStore.community,
+      page: 1,
+      pageSize: 6,
+      lite: true,
+      needTotal: false,
+      ...getRecentQuery()
+    }
+  })
+
+  if (!result?.success) {
+    throw new Error(result?.error || '列表加载失败')
+  }
+
+  recentDisputes.value = (result.data || []).map(mapDispute)
+  setPageCache(buildScopedKey('recent'), recentDisputes.value)
+}
+
+const refreshDashboard = async (force = false) => {
+  if (!userStore.isLogin) {
+    return
+  }
+
+  if (refreshingDashboard.value) {
+    return
+  }
+
+  refreshingDashboard.value = true
+  try {
+    await Promise.all([
+      loadStatistics(force),
+      loadRecentDisputes(force)
+    ])
+    lastRefreshAt.value = Date.now()
+  } finally {
+    refreshingDashboard.value = false
+  }
+}
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hours = `${date.getHours()}`.padStart(2, '0')
+  const minutes = `${date.getMinutes()}`.padStart(2, '0')
+  return `${month}-${day} ${hours}:${minutes}`
+}
+
+const getUrgencyClass = (urgency) => URGENCY_TAG_CLASS_MAP[urgency] || 'tag-primary'
+
+const goToInput = () => {
+  switchTabWithFallback('/pages/input/index')
+}
+
+const goToStreetManage = () => {
+  switchTabWithFallback(getStreetTabByRole(userStore.role))
+}
+
+const goToDetailList = () => {
+  switchTabWithFallback('/pages/community/index')
+}
+
+const goToDetail = (id) => {
+  uni.navigateTo({ url: `/pages/detail/index?id=${id}` })
+}
+
+const goToUserManage = () => {
+  uni.navigateTo({ url: '/pages/admin/user-list' })
+}
+
+const onStatusChange = (e) => {
+  statusIndex.value = Number(e.detail.value) || 0
+}
+
+const onCommunityChange = (e) => {
+  communityIndex.value = Number(e.detail.value) || 0
+}
+
+const onRiskLevelChange = (e) => {
+  riskLevelIndex.value = Number(e.detail.value) || 0
+}
+
+const onStartDateChange = (e) => {
+  startDate.value = e.detail.value
+  if (endDate.value && endDate.value < startDate.value) {
+    endDate.value = ''
+  }
+}
+
+const onEndDateChange = (e) => {
+  endDate.value = e.detail.value
+  if (startDate.value && endDate.value < startDate.value) {
+    const temp = startDate.value
+    startDate.value = endDate.value
+    endDate.value = temp
+  }
+}
+
+const resetForm = () => {
+  startDate.value = ''
+  endDate.value = ''
+  statusIndex.value = 0
+  communityIndex.value = 0
+  riskLevelIndex.value = 0
+}
+
+const exportData = async () => {
+  if (!isAdmin.value) {
+    return
+  }
+
+  try {
+    uni.showLoading({ title: '导出中...' })
+
+    const allRows = []
+    let currentPage = 1
+    const exportPageSize = 100
+
+    while (true) {
+      const { result } = await uniCloud.callFunction({
+        name: 'getDisputeList',
+        data: {
+          role: userStore.role,
+          openid: userStore.openid,
+          community: userStore.community,
+          page: currentPage,
+          pageSize: exportPageSize,
+          needTotal: false,
+          status: statusOptions[statusIndex.value] === FILTER_ALL ? '' : statusOptions[statusIndex.value],
+          communityFilter: communityOptions[communityIndex.value] === FILTER_ALL ? '' : communityOptions[communityIndex.value],
+          urgency: riskLevelOptions[riskLevelIndex.value] === FILTER_ALL ? '' : riskLevelOptions[riskLevelIndex.value],
+          startDate: startDate.value,
+          endDate: endDate.value
+        }
+      })
+
+      if (!result?.success) {
+        throw new Error(result?.error || '导出失败')
+      }
+
+      const rows = result.data || []
+      allRows.push(...rows)
+      if (!result.hasMore || rows.length < exportPageSize) {
+        break
+      }
+      currentPage += 1
+    }
+
+    if (allRows.length === 0) {
+      uni.showToast({ title: '暂无数据可导出', icon: 'none' })
+      return
+    }
+
+    const headers = [
+      '纠纷ID',
+      '标题',
+      '来源',
+      '状态',
+      '紧急程度',
+      '所属社区',
+      '分派社区',
+      '发生次数',
+      '涉及人员',
+      '地址',
+      '创建时间'
+    ]
+
+    const body = allRows.map((item) => [
+      item._id || '',
+      `"${item.title || ''}"`,
+      item.source || '',
+      item.status || '',
+      item.urgency || '',
+      item.community || '',
+      item.assign_community || '',
+      item.occur_count || 1,
+      `"${item.parties || ''}"`,
+      `"${item.location?.address || ''}"`,
+      item.create_time ? new Date(item.create_time).toLocaleString('zh-CN', { hour12: false }) : ''
+    ])
+
+    const csv = [headers.join(','), ...body.map((row) => row.join(','))].join('\n')
+    const fileName = `纠纷数据_${new Date().toISOString().slice(0, 10)}.csv`
+    const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
+
+    wx.getFileSystemManager().writeFileSync(filePath, csv, 'utf8')
+    uni.showToast({ title: '导出成功', icon: 'success' })
+    wx.openDocument({ filePath })
+  } catch (error) {
+    console.error('导出失败', error)
+    uni.showToast({ title: error.message || '导出失败', icon: 'none' })
+  } finally {
+    uni.hideLoading()
+  }
+}
+
+onMounted(async () => {
+  initNavbar()
+  hydrateCache()
+
+  if (userStore.isLogin) {
+    isInitializing.value = true
+    try {
+      await refreshDashboard(false)
+    } catch (error) {
+      console.error('首页数据加载失败', error)
+    } finally {
+      isInitializing.value = false
+      hasInitialized.value = true
+    }
+  } else {
+    hasInitialized.value = true
+  }
+})
+
+onShow(async () => {
+  initNavbar()
+  if (!userStore.isLogin) {
+    return
+  }
+  if (isInitializing.value || !hasInitialized.value) {
+    return
+  }
+
+  const isDirty = getPageCacheDirtyAt('home:') > lastRefreshAt.value
+  const isStale = Date.now() - lastRefreshAt.value > REFRESH_INTERVAL
+  if (recentDisputes.value.length === 0 || isStale || isDirty) {
+    try {
+      await refreshDashboard(isStale || isDirty)
+    } catch (error) {
+      console.error('首页轻刷新失败', error)
+    }
+  }
+})
+
+onPullDownRefresh(async () => {
+  try {
+    await refreshDashboard(true)
+  } catch (error) {
+    console.error('首页下拉刷新失败', error)
+  } finally {
+    uni.stopPullDownRefresh()
+  }
+})
 </script>
 
-<style lang="scss">
-	.container {
-		min-height: 100vh;
-		background: linear-gradient(180deg, #e6f2ff 0%, #f0f7ff 100%);
-		padding: 20rpx 20rpx;
-		box-sizing: border-box;
-	}
-	
-	/* 通用卡片样式 */
-	.stats-card {
-		background: #fff;
-		border-radius: 20rpx;
-		padding: 40rpx 32rpx;
-		text-align: center;
-		box-shadow: 0 4rpx 20rpx rgba(22, 119, 255, 0.08);
-		border: 1rpx solid rgba(22, 119, 255, 0.06);
-		position: relative;
-		overflow: hidden;
-		transition: all 0.3s ease;
-		
-		&::before {
-			content: '';
-			position: absolute;
-			top: 0;
-			left: 0;
-			right: 0;
-			height: 4rpx;
-			background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
-		}
-		
-		&:active {
-			transform: scale(0.98);
-		}
-		
-		&.highlight {
-			background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-			color: #fff;
-			box-shadow: 0 8rpx 24rpx rgba(22, 119, 255, 0.25);
-			
-			&::before {
-				display: none;
-			}
-			
-			.stats-title {
-				color: rgba(255, 255, 255, 0.9);
-			}
-			
-			.stats-value {
-				color: #fff;
-			}
-			
-			.stats-desc {
-				color: rgba(255, 255, 255, 0.8);
-			}
-		}
-		
-		.stats-title {
-			font-size: 26rpx;
-			color: var(--text-secondary);
-			margin-bottom: 16rpx;
-		}
-		
-		.stats-value {
-			font-size: 56rpx;
-			font-weight: bold;
-			color: var(--text-primary);
-			margin-bottom: 12rpx;
-			line-height: 1.2;
-		}
-		
-		.stats-desc {
-			font-size: 24rpx;
-			color: var(--text-tertiary);
-		}
-	}
-	
-	/* 通用按钮样式 */
-	.btn-primary {
-		background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-		color: #fff;
-		font-size: 30rpx;
-		font-weight: 600;
-		border-radius: 16rpx;
-		box-shadow: 0 6rpx 20rpx rgba(22, 119, 255, 0.25);
-		transition: all 0.3s ease;
-		
-		&:active {
-			transform: scale(0.98);
-			box-shadow: 0 4rpx 12rpx rgba(22, 119, 255, 0.2);
-		}
-		
-		&::after {
-			border: none;
-		}
-	}
-	
-	/* 通用列表样式 */
-	.recent-list {
-		background: #fff;
-		border-radius: 20rpx;
-		padding: 32rpx;
-		box-shadow: 0 4rpx 20rpx rgba(22, 119, 255, 0.08);
-		border: 1rpx solid rgba(22, 119, 255, 0.06);
-		
-		.section-title {
-			font-size: 30rpx;
-			font-weight: 600;
-			color: var(--text-primary);
-			margin-bottom: 24rpx;
-			text-align: center;
-			position: relative;
-			padding-bottom: 16rpx;
-			
-			&::after {
-				content: '';
-				position: absolute;
-				bottom: 0;
-				left: 50%;
-				transform: translateX(-50%);
-				width: 60rpx;
-				height: 4rpx;
-				background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
-				border-radius: 2rpx;
-			}
-		}
-		
-		.list-item {
-			padding: 24rpx 0;
-			border-bottom: 1rpx solid var(--border);
-			transition: all 0.3s ease;
-			
-			&:last-child {
-				border-bottom: none;
-			}
-			
-			&:active {
-				background: var(--bg-card);
-				margin: 0 -16rpx;
-				padding-left: 16rpx;
-				padding-right: 16rpx;
-				border-radius: 12rpx;
-			}
-			
-			.item-header {
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				margin-bottom: 16rpx;
-				
-				.item-title {
-					font-size: 28rpx;
-					font-weight: 500;
-					color: var(--text-primary);
-					flex: 1;
-					margin-right: 16rpx;
-					overflow: hidden;
-					text-overflow: ellipsis;
-					white-space: nowrap;
-				}
-			}
-			
-			.item-info {
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				
-				.item-time {
-					font-size: 24rpx;
-					color: var(--text-tertiary);
-				}
-				
-				.item-from {
-					font-size: 24rpx;
-					color: var(--text-secondary);
-				}
-				
-				.status-text {
-					font-size: 24rpx;
-					font-weight: 500;
-					
-					&.pending {
-						color: var(--warning);
-					}
-					
-					&.processing {
-						color: var(--primary);
-					}
-					
-					&.resolved {
-						color: var(--success);
-					}
-					
-					&.closed {
-						color: var(--text-tertiary);
-					}
-				}
-			}
-		}
-	}
-	
-	/* 派出所视图 */
-	.police-view {
-		.action-card {
-			margin-bottom: 24rpx;
-			
-			.btn-large {
-				width: 100%;
-				height: 120rpx;
-				line-height: 120rpx;
-				font-size: 34rpx;
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				gap: 16rpx;
-				
-				.icon-plus {
-					font-size: 36rpx;
-					font-weight: 700;
-				}
-			}
-		}
-		
-		.stats-section {
-			margin-bottom: 24rpx;
-			
-			.stats-card {
-				margin-bottom: 20rpx;
-				
-				&:last-child {
-					margin-bottom: 0;
-				}
-			}
-		}
-	}
-	
-	/* 街道视图 */
-	.street-view {
-		.stats-grid {
-			display: grid;
-			grid-template-columns: repeat(3, 1fr);
-			gap: 16rpx;
-			margin-bottom: 24rpx;
-			
-			.stats-card {
-				padding: 32rpx 16rpx;
-				
-				.stats-title {
-					font-size: 24rpx;
-				}
-				
-				.stats-value {
-					font-size: 44rpx;
-				}
-			}
-		}
-		
-		.action-card {
-			margin-bottom: 24rpx;
-			
-			.btn-primary {
-				width: 100%;
-				height: 88rpx;
-				line-height: 88rpx;
-			}
-		}
-	}
-	
-	/* 社区视图 */
-	.community-view {
-		.stats-section {
-			margin-bottom: 24rpx;
-			
-			.stats-card {
-				&::before {
-					background: linear-gradient(90deg, var(--success) 0%, #73d13d 100%);
-				}
-			}
-		}
-	}
-	
-	/* 管理员视图 */
-	.admin-view {
-		.stats-grid {
-			display: grid;
-			grid-template-columns: repeat(3, 1fr);
-			gap: 16rpx;
-			margin-bottom: 24rpx;
-			
-			.stats-card {
-				padding: 32rpx 16rpx;
-				
-				.stats-title {
-					font-size: 24rpx;
-				}
-				
-				.stats-value {
-					font-size: 44rpx;
-				}
-			}
-		}
-		
-		.admin-actions {
-			background: #fff;
-			border-radius: 20rpx;
-			padding: 32rpx 24rpx;
-			margin-bottom: 24rpx;
-			box-shadow: 0 4rpx 20rpx rgba(22, 119, 255, 0.08);
-			border: 1rpx solid rgba(22, 119, 255, 0.06);
-			
-			.action-grid {
-				display: grid;
-				grid-template-columns: repeat(3, 1fr);
-				gap: 20rpx;
-				
-				.action-item {
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					padding: 28rpx 16rpx;
-					background: #f8fafc;
-					border-radius: 16rpx;
-					transition: all 0.3s ease;
-					
-					&:active {
-						transform: scale(0.96);
-						background: var(--primary);
-						
-						.action-icon,
-						.action-text {
-							color: #fff;
-						}
-					}
-					
-					.action-icon {
-						font-size: 52rpx;
-						margin-bottom: 12rpx;
-					}
-					
-					.action-text {
-						font-size: 24rpx;
-						color: var(--text-secondary);
-						font-weight: 500;
-					}
-				}
-			}
-		}
-		
-		.export-section {
-			background: #fff;
-			border-radius: 20rpx;
-			padding: 32rpx;
-			box-shadow: 0 4rpx 20rpx rgba(22, 119, 255, 0.08);
-			border: 1rpx solid rgba(22, 119, 255, 0.06);
-			
-			.export-form {
-				.form-row {
-					margin-bottom: 24rpx;
-					
-					.form-label {
-						display: block;
-						font-size: 28rpx;
-						color: var(--text-primary);
-						margin-bottom: 12rpx;
-						font-weight: 500;
-					}
-					
-					.picker-input {
-						display: flex;
-						align-items: center;
-						justify-content: space-between;
-						background: #f8fafc;
-						border-radius: 12rpx;
-						padding: 24rpx;
-						font-size: 28rpx;
-						color: var(--text-primary);
-						border: 1rpx solid var(--border);
-						
-						.arrow {
-							font-size: 32rpx;
-							color: var(--text-tertiary);
-						}
-					}
-				}
-				
-				.form-actions {
-					display: flex;
-					gap: 20rpx;
-					margin-top: 32rpx;
-					
-					button {
-						flex: 1;
-						height: 84rpx;
-						line-height: 84rpx;
-						font-size: 28rpx;
-						font-weight: 500;
-						border-radius: 12rpx;
-					}
-					
-					.btn-secondary {
-						background: #f5f5f5;
-						color: #333;
-						border: 1rpx solid var(--border);
-					}
-					
-					.btn-export {
-						background: #f0f0f0;
-						color: #333;
-						box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
-						border: 1rpx solid #e0e0e0;
-					}
-				}
-			}
-		}
-	}
-	
-	/* 标签样式 */
-	.tag {
-		padding: 6rpx 16rpx;
-		border-radius: 8rpx;
-		font-size: 22rpx;
-		font-weight: 500;
-		
-		&.tag-primary {
-			background: #e6f7ff;
-			color: var(--primary);
-		}
-		
-		&.tag-danger {
-			background: #fff1f0;
-			color: var(--danger);
-		}
-		
-		&.tag-warning {
-			background: #fff7e6;
-			color: var(--warning);
-		}
-	}
-	
-	/* 空状态 */
-	.empty {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 80rpx 40rpx;
-		text-align: center;
-		
-		.empty-icon {
-			font-size: 72rpx;
-			margin-bottom: 20rpx;
-		}
-		
-		.empty-text {
-			font-size: 28rpx;
-			color: var(--text-tertiary);
-			margin-bottom: 12rpx;
-		}
-		
-		.empty-subtext {
-			font-size: 24rpx;
-			color: var(--text-tertiary);
-			opacity: 0.7;
-		}
-		
-		.login-btn {
-			margin-top: 32rpx;
-			padding: 16rpx 48rpx;
-			background: var(--primary);
-			color: #fff;
-			border-radius: 12rpx;
-			font-size: 28rpx;
-			font-weight: 500;
-		}
-	}
-	
-	/* 无角色视图 */
-	.no-role-view,
-	.not-login-view {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 60vh;
-	}
-	
-	/* 动画 */
-	.fade-in {
-		animation: fadeIn 0.4s ease-out;
-	}
-	
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(16rpx);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
+<style lang="scss" scoped>
+.home-page {
+  min-height: 100vh;
+  padding: 20rpx;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 24%),
+    linear-gradient(180deg, #deecff 0%, #f7faff 38%, #eef4ff 100%);
+}
+
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.hero-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, rgba(20, 91, 215, 0.96) 0%, rgba(79, 149, 255, 0.92) 100%);
+  box-shadow: 0 18rpx 38rpx rgba(20, 91, 215, 0.18);
+  color: #fff;
+}
+
+.hero-copy {
+  flex: 1;
+}
+
+.hero-kicker {
+  display: block;
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.hero-title {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 38rpx;
+  line-height: 1.28;
+  font-weight: 700;
+}
+
+.hero-desc {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.hero-side {
+  flex-shrink: 0;
+  min-width: 180rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12rpx;
+}
+
+.hero-role,
+.hero-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 22rpx;
+}
+
+.action-card,
+.panel-card,
+.stats-card,
+.action-item {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(22, 119, 255, 0.08);
+  box-shadow: 0 12rpx 28rpx rgba(22, 119, 255, 0.08);
+}
+
+.action-card {
+  padding: 22rpx;
+}
+
+.action-card.compact {
+  padding: 18rpx;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+}
+
+.quick-item {
+  padding: 24rpx 22rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(22, 119, 255, 0.08);
+  box-shadow: 0 12rpx 28rpx rgba(22, 119, 255, 0.08);
+}
+
+.quick-icon {
+  width: 34rpx;
+  height: 34rpx;
+  margin-bottom: 16rpx;
+}
+
+.quick-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1f3150;
+}
+
+.quick-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #7b8ea6;
+}
+
+.btn-primary,
+.btn-secondary {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 18rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.btn-primary::after,
+.btn-secondary::after {
+  border: none;
+}
+
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
+}
+
+.btn-large {
+  height: 104rpx;
+  line-height: 104rpx;
+  font-size: 34rpx;
+}
+
+.btn-secondary {
+  color: #35506f;
+  background: #eef4ff;
+}
+
+.stats-grid {
+  display: grid;
+  gap: 16rpx;
+}
+
+.single-column {
+  grid-template-columns: 1fr;
+}
+
+.two-column {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.three-column {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.stats-card {
+  padding: 28rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.stats-card.accent {
+  background: linear-gradient(135deg, rgba(20, 91, 215, 0.96) 0%, rgba(79, 149, 255, 0.96) 100%);
+}
+
+.stats-card.accent .stats-label,
+.stats-card.accent .stats-value,
+.stats-card.accent .stats-desc {
+  color: #fff;
+}
+
+.stats-label {
+  font-size: 24rpx;
+  color: #6c7f96;
+}
+
+.stats-value {
+  font-size: 50rpx;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #163052;
+}
+
+.stats-desc {
+  font-size: 22rpx;
+  color: #8190a4;
+}
+
+.panel-card {
+  padding: 28rpx;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.panel-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f3150;
+}
+
+.panel-meta {
+  font-size: 22rpx;
+  color: #7a8ea7;
+}
+
+.list-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-item {
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #eef3f8;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.item-top,
+.item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.item-bottom {
+  margin-top: 12rpx;
+}
+
+.item-title {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f3150;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-sub,
+.item-time {
+  font-size: 23rpx;
+  color: #7b8ea6;
+}
+
+.status-chip,
+.urgency-chip {
+  flex-shrink: 0;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.status-pending {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+.status-processing {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
+.status-resolved {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-closed {
+  background: #f5f5f5;
+  color: #8c8c8c;
+}
+
+.tag-primary {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
+.tag-warning {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+.tag-danger {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.action-item {
+  padding: 26rpx 22rpx;
+}
+
+.action-icon {
+  width: 34rpx;
+  height: 34rpx;
+  margin-bottom: 16rpx;
+}
+
+.action-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1f3150;
+  margin-bottom: 8rpx;
+}
+
+.action-desc {
+  display: block;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #7b8ea6;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18rpx 16rpx;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.form-label {
+  font-size: 24rpx;
+  color: #62758c;
+}
+
+.picker-shell {
+  min-height: 84rpx;
+  padding: 0 22rpx;
+  border-radius: 18rpx;
+  background: #f7faff;
+  border: 1rpx solid #e6edf5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 26rpx;
+  color: #22334c;
+}
+
+.picker-arrow {
+  width: 28rpx;
+  height: 28rpx;
+  opacity: 0.72;
+  flex-shrink: 0;
+}
+
+.filter-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.empty-wrap {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56rpx 40rpx;
+  text-align: center;
+}
+
+.empty-mark {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #d6e7ff 0%, #eef5ff 100%);
+  margin-bottom: 18rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #70839b;
+}
+
+.empty-desc {
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  line-height: 1.6;
+  color: #91a2b7;
+}
+
+.empty-btn {
+  min-width: 220rpx;
+  margin-top: 22rpx;
+}
+
+@media (max-width: 520px) {
+  .hero-card {
+    flex-direction: column;
+  }
+
+  .hero-side {
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .quick-grid,
+  .action-grid,
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.login-link {
+  margin-top: 24rpx;
+  padding: 16rpx 34rpx;
+  border-radius: 999rpx;
+  background: #145bd7;
+  color: #fff;
+  font-size: 26rpx;
+}
 </style>

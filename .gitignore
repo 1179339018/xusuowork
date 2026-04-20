@@ -1,6 +1,7 @@
 # 依赖
 node_modules/
 unpackage/
+unpackage_backup/
 
 # 日志
 *.log
@@ -23,3 +24,7 @@ project.private.config.json
 # 临时文件
 *.tmp
 *.temp
+
+# 大型目录
+mission-control/
+openclaw-zero-token/

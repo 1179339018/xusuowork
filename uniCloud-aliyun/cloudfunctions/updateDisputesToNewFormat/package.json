@@ -1,0 +1,7 @@
+{
+	"name": "updateDisputesToNewFormat",
+	"version": "1.0.0",
+	"description": "更新纠纷数据到新格式",
+	"main": "index.js",
+	"dependencies": {}
+}

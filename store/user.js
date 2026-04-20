@@ -1,91 +1,137 @@
 import { defineStore } from 'pinia'
+import { USER_ROLES } from '@/utils/constants'
+
+const STORAGE_KEY = 'user'
+
+function buildStorageAdapter() {
+  return {
+    getItem: (key) => uni.getStorageSync(key),
+    setItem: (key, value) => uni.setStorageSync(key, value),
+    removeItem: (key) => uni.removeStorageSync(key)
+  }
+}
+
+function createDefaultState() {
+  return {
+    _id: '',
+    openid: '',
+    role: '',
+    name: '',
+    phone: '',
+    avatar: '',
+    community: '',
+    authorized_roles: [],
+    isLogin: false,
+    manuallyLoggedOut: false
+  }
+}
+
+function normalizeUserInfo(userInfo = {}) {
+  const roles = Array.isArray(userInfo.authorized_roles) && userInfo.authorized_roles.length > 0
+    ? userInfo.authorized_roles
+    : (userInfo.role ? [userInfo.role] : [])
+
+  return {
+    ...createDefaultState(),
+    ...userInfo,
+    role: userInfo.role || roles[0] || '',
+    authorized_roles: roles,
+    isLogin: Boolean(userInfo.openid && (userInfo.role || roles[0])),
+    manuallyLoggedOut: Boolean(userInfo.manuallyLoggedOut)
+  }
+}
 
 export const useUserStore = defineStore('user', {
-	state: () => ({
-		openid: '',
-		role: '', // 当前角色：'派出所' | '街道' | '社区' | '管理员'
-		name: '',
-		phone: '',
-		avatar: '',
-		community: '', // 社区ID（仅社区角色有）
-		authorized_roles: [], // 授权的角色列表
-		isLogin: false,
-		manuallyLoggedOut: false
-	}),
-	
-	getters: {
-		isPolice: (state) => state.role === '派出所',
-		isStreet: (state) => state.role === '街道',
-		isCommunity: (state) => state.role === '社区',
-		isAdmin: (state) => state.role === '管理员'
-	},
-	
-	actions: {
-		setUser(userInfo) {
-			console.log('设置用户信息:', userInfo)
-			this.openid = userInfo.openid || ''
-			this.role = userInfo.role || ''
-			this.name = userInfo.name || ''
-			this.phone = userInfo.phone || ''
-			this.avatar = userInfo.avatar || ''
-			this.community = userInfo.community || ''
-			this.authorized_roles = userInfo.authorized_roles || []
-			this.isLogin = true
-			this.manuallyLoggedOut = false
-			
-			// 手动保存到本地存储，确保数据被正确保存
-			try {
-				uni.setStorageSync('user', {
-					openid: this.openid,
-					role: this.role,
-					name: this.name,
-					phone: this.phone,
-					avatar: this.avatar,
-					community: this.community,
-					authorized_roles: this.authorized_roles,
-					isLogin: this.isLogin,
-					manuallyLoggedOut: this.manuallyLoggedOut
-				})
-				console.log('用户信息已保存到本地存储')
-			} catch (error) {
-				console.error('保存用户信息到本地存储失败:', error)
-			}
-		},
-		
-		clearUser() {
-			this.openid = ''
-			this.role = ''
-			this.name = ''
-			this.phone = ''
-			this.avatar = ''
-			this.community = ''
-			this.authorized_roles = []
-			this.isLogin = false
-			this.manuallyLoggedOut = false
-		},
-		
-		logout() {
-			this.clearUser()
-		},
-		
-		switchRole(newRole) {
-			if (this.authorized_roles.includes(newRole)) {
-				this.role = newRole
-			}
-		}
-	},
-	
-	persist: {
-		enabled: true,
-		strategies: [
-			{
-				key: 'user',
-				storage: {
-					getItem: (key) => uni.getStorageSync(key),
-					setItem: (key, value) => uni.setStorageSync(key, value),
-					removeItem: (key) => uni.removeStorageSync(key)
-				}
-			}
-		]
-	}
+  state: () => createDefaultState(),
+
+  getters: {
+    isPolice: (state) => state.role === USER_ROLES.POLICE,
+    isStreet: (state) => state.role === USER_ROLES.STREET,
+    isCommunity: (state) => state.role === USER_ROLES.COMMUNITY,
+    isAdmin: (state) => state.role === USER_ROLES.ADMIN,
+    hasSession: (state) => Boolean(state.openid && state.role),
+    hasAuthorizedRoles: (state) => Array.isArray(state.authorized_roles) && state.authorized_roles.length > 0
+  },
+
+  actions: {
+    syncStorage() {
+      try {
+        uni.setStorageSync(STORAGE_KEY, {
+          _id: this._id,
+          openid: this.openid,
+          role: this.role,
+          name: this.name,
+          phone: this.phone,
+          avatar: this.avatar,
+          community: this.community,
+          authorized_roles: this.authorized_roles,
+          isLogin: this.isLogin,
+          manuallyLoggedOut: this.manuallyLoggedOut
+        })
+      } catch (error) {
+        console.error('保存用户信息失败', error)
+      }
+    },
+
+    applyUser(userInfo = {}) {
+      const normalized = normalizeUserInfo(userInfo)
+      Object.assign(this, normalized)
+      this.isLogin = this.hasSession
+    },
+
+    setUser(userInfo = {}) {
+      this.applyUser({
+        ...userInfo,
+        manuallyLoggedOut: false
+      })
+      this.syncStorage()
+    },
+
+    restoreUser(userInfo = null) {
+      const storedUser = userInfo || uni.getStorageSync(STORAGE_KEY)
+      if (!storedUser || storedUser.manuallyLoggedOut) {
+        return false
+      }
+
+      const normalized = normalizeUserInfo(storedUser)
+      if (!normalized.openid || !normalized.role) {
+        return false
+      }
+
+      this.applyUser(normalized)
+      return true
+    },
+
+    clearUser(options = {}) {
+      const manuallyLoggedOut = Boolean(options.manuallyLoggedOut)
+      Object.assign(this, createDefaultState(), {
+        manuallyLoggedOut
+      })
+      this.syncStorage()
+    },
+
+    logout() {
+      this.clearUser({ manuallyLoggedOut: true })
+    },
+
+    switchRole(newRole) {
+      if (!this.authorized_roles.includes(newRole)) {
+        return
+      }
+
+      this.role = newRole
+      this.isLogin = this.hasSession
+      this.syncStorage()
+    }
+  },
+
+  persist: {
+    enabled: true,
+    strategies: [
+      {
+        key: STORAGE_KEY,
+        storage: buildStorageAdapter()
+      }
+    ]
+  }
 })

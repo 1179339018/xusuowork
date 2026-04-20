@@ -1,18 +1,19 @@
 'use strict';
 const db = uniCloud.database()
+const { DISPUTE_STATUS, USER_ROLES } = require('../common/app-constants')
 
 exports.main = async (event, context) => {
 	// 模拟的初始用户数据
 	const users = [
 		{
 			openid: 'test_admin_001',
-			role: '派出所',
+			role: USER_ROLES.POLICE,
 			name: '张警官',
 			create_time: Date.now()
 		},
 		{
 			openid: 'test_community_001',
-			role: '社区',
+			role: USER_ROLES.COMMUNITY,
 			name: '李社工',
 			community: 'happiness_community', // 幸福社区
 			create_time: Date.now()
@@ -32,7 +33,7 @@ exports.main = async (event, context) => {
 			},
 			parties: '王某, 赵某',
 			urgency: '一般',
-			status: '待分派',
+			status: DISPUTE_STATUS.PENDING_ASSIGN,
 			occur_count: 1,
 			create_time: Date.now(),
 			create_user: 'test_admin_001'
@@ -48,7 +49,7 @@ exports.main = async (event, context) => {
 			},
 			parties: '孙某, 李某',
 			urgency: '紧急',
-			status: '处理中',
+			status: DISPUTE_STATUS.PROCESSING,
 			assign_community: 'happiness_community',
 			occur_count: 2,
 			create_time: Date.now() - 86400000, // 昨天

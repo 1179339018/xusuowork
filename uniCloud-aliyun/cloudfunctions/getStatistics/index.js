@@ -2,80 +2,84 @@
 
 const db = uniCloud.database()
 const dbCmd = db.command
+const { DISPUTE_STATUS, USER_ROLES } = require('../common/app-constants')
 
 exports.main = async (event, context) => {
-	const { role, community } = event
-	
+	const { role, community, openid } = event
+
 	try {
 		const today = new Date()
 		today.setHours(0, 0, 0, 0)
 		const tomorrow = new Date(today)
 		tomorrow.setDate(tomorrow.getDate() + 1)
-		
-		let baseQuery = db.collection('disputes')
-		
-		// 根据角色过滤
-		if (role === '社区') {
-			baseQuery = baseQuery.where({
+
+		const baseFilters = []
+		if (role === USER_ROLES.COMMUNITY && community) {
+			baseFilters.push({
 				assign_community: community
 			})
 		}
-		
-		// 今日新增
-		const todayNewRes = await baseQuery
-			.where({
+
+		if (role === USER_ROLES.POLICE && openid) {
+			baseFilters.push({
+				create_user: openid
+			})
+		}
+
+		const buildQuery = (extraFilter) => {
+			const filters = extraFilter ? [...baseFilters, extraFilter] : [...baseFilters]
+			if (filters.length === 0) {
+				return db.collection('disputes')
+			}
+			return db.collection('disputes').where(filters.length === 1 ? filters[0] : dbCmd.and(filters))
+		}
+
+		const [
+			todayNewRes,
+			pendingAssignRes,
+			pendingVisitRes,
+			processingRes,
+			resolvedRes,
+			totalRes,
+			userRes
+		] = await Promise.all([
+			buildQuery({
 				create_time: dbCmd.gte(today).and(dbCmd.lt(tomorrow))
-			})
-			.count()
-		
-		// 待分派（街道）
-		const pendingAssignRes = await db.collection('disputes')
-			.where({
-				status: '待分派'
-			})
-			.count()
-		
-		// 待回访（社区）
-		const pendingVisitRes = await baseQuery
-			.where({
-				status: '待回访'
-			})
-			.count()
-		
-		// 已化解
-		const resolvedRes = await baseQuery
-			.where({
-				status: '已化解'
-			})
-			.count()
-		
-		// 总数
-			const totalRes = await baseQuery.count()
-			
-			// 化解率
-			const resolveRate = totalRes.total > 0 
-				? ((resolvedRes.total / totalRes.total) * 100).toFixed(1) 
-				: '0.0'
-			
-			// 用户数（仅管理员需要）
-			let userCount = 0
-			if (role === '管理员') {
-				const userRes = await db.collection('users').count()
-				userCount = userRes.total
+			}).count(),
+			buildQuery({
+				status: DISPUTE_STATUS.PENDING_ASSIGN
+			}).count(),
+			buildQuery({
+				status: DISPUTE_STATUS.PENDING_VISIT
+			}).count(),
+			buildQuery({
+				status: DISPUTE_STATUS.PROCESSING
+			}).count(),
+			buildQuery({
+				status: DISPUTE_STATUS.RESOLVED
+			}).count(),
+			buildQuery().count(),
+			role === USER_ROLES.ADMIN ? db.collection('users').count() : Promise.resolve({ total: 0 })
+		])
+
+		const resolveRate = totalRes.total > 0
+			? ((resolvedRes.total / totalRes.total) * 100).toFixed(1)
+			: '0.0'
+
+		return {
+			success: true,
+			data: {
+				todayNew: todayNewRes.total,
+				pendingAssign: pendingAssignRes.total,
+				pendingVisit: pendingVisitRes.total,
+				processing: processingRes.total,
+				resolved: resolvedRes.total,
+				pendingPolice: 0,
+				totalCount: totalRes.total,
+				resolveRate,
+				userCount: userRes.total || 0
 			}
-			
-			return {
-				success: true,
-				data: {
-					todayNew: todayNewRes.total,
-					pendingAssign: pendingAssignRes.total,
-					pendingVisit: pendingVisitRes.total,
-					resolved: resolvedRes.total,
-					totalCount: totalRes.total,
-					resolveRate: resolveRate,
-					userCount: userCount
-				}
-			}
+		}
 	} catch (e) {
 		console.error('获取统计失败', e)
 		return {

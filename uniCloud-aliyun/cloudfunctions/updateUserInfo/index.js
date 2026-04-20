@@ -4,11 +4,19 @@ const db = uniCloud.database();
 
 exports.main = async (event, context) => {
   const { openid, name, avatar } = event;
+  const requestOpenid = context.OPENID || context.openid || openid;
   
-  if (!openid) {
+  if (!openid || !requestOpenid) {
     return {
       success: false,
       error: '缺少openid参数'
+    };
+  }
+
+  if (requestOpenid !== openid) {
+    return {
+      success: false,
+      error: '无权修改其他用户资料'
     };
   }
   
@@ -20,7 +28,7 @@ exports.main = async (event, context) => {
     
     // 更新用户信息
     const result = await db.collection('users').where({
-      openid: openid
+      openid: requestOpenid
     }).update(updateData);
     
     if (result.updated === 0) {

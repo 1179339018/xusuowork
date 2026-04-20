@@ -2,73 +2,128 @@
 
 const db = uniCloud.database()
 const dbCmd = db.command
+const { USER_ROLES } = require('../common/app-constants')
 
 exports.main = async (event, context) => {
-	const { 
-		role, 
-		community, 
-		status, 
-		keyword, 
-		startDate, 
+	const {
+		role,
+		openid,
+		community,
+		communityFilter,
+		status,
+		urgency,
+		keyword,
+		startDate,
 		endDate,
+		lite = false,
 		page = 1,
 		pageSize = 10
 	} = event
-	
+
 	try {
+		const currentPage = Math.max(Number(page) || 1, 1)
+		const currentPageSize = Math.min(Math.max(Number(pageSize) || 10, 1), 50)
+
 		let query = db.collection('disputes')
-		
-		// 根据角色过滤
-		if (role === '社区') {
-			query = query.where({
+		const filters = []
+
+		if (role === USER_ROLES.POLICE && openid) {
+			filters.push({
+				create_user: openid
+			})
+		}
+
+		if (role === USER_ROLES.COMMUNITY && community) {
+			filters.push({
 				assign_community: community
 			})
 		}
-		
-		// 状态过滤
+
 		if (status && status !== '全部') {
-			query = query.where({
-				status: status
+			filters.push({
+				status
 			})
 		}
-		
-		// 关键词搜索
+
+		if (communityFilter && communityFilter !== '全部') {
+			filters.push(dbCmd.or([
+				{ community: communityFilter },
+				{ assign_community: communityFilter }
+			]))
+		}
+
+		if (urgency) {
+			filters.push({
+				urgency
+			})
+		}
+
 		if (keyword) {
-			query = query.where(
-				dbCmd.or([
-					{ title: new RegExp(keyword, 'i') },
-					{ description: new RegExp(keyword, 'i') },
-					{ parties: new RegExp(keyword, 'i') }
-				])
-			)
+			filters.push(dbCmd.or([
+				{ title: new RegExp(keyword, 'i') },
+				{ description: new RegExp(keyword, 'i') },
+				{ parties: new RegExp(keyword, 'i') }
+			]))
 		}
-		
-		// 日期范围
-		if (startDate && endDate) {
-			query = query.where({
-				create_time: dbCmd.gte(new Date(startDate)).and(dbCmd.lte(new Date(endDate)))
+
+		if (startDate || endDate) {
+			const dateFilter = {}
+			if (startDate) {
+				dateFilter.create_time = dbCmd.gte(new Date(startDate))
+			}
+
+			if (endDate) {
+				const end = new Date(endDate)
+				end.setHours(23, 59, 59, 999)
+				dateFilter.create_time = dateFilter.create_time
+					? dateFilter.create_time.and(dbCmd.lte(end))
+					: dbCmd.lte(end)
+			}
+
+			filters.push(dateFilter)
+		}
+
+		if (filters.length > 0) {
+			query = query.where(filters.length === 1 ? filters[0] : dbCmd.and(filters))
+		}
+
+		if (lite) {
+			query = query.field({
+				title: true,
+				source: true,
+				status: true,
+				urgency: true,
+				location: true,
+				parties: true,
+				occur_count: true,
+				create_time: true,
+				assign_time: true,
+				community: true,
+				assign_community: true
 			})
 		}
-		
-		// 排序和分页
+
 		const res = await query
 			.orderBy('create_time', 'desc')
-			.skip((page - 1) * pageSize)
-			.limit(pageSize)
+			.skip((currentPage - 1) * currentPageSize)
+			.limit(currentPageSize + 1)
 			.get()
-		
-		// 只有在需要总数时才查询（首页最近列表不需要总数）
+
+		const rows = res.data || []
+		const hasMore = rows.length > currentPageSize
+		const data = hasMore ? rows.slice(0, currentPageSize) : rows
+
 		let total = 0
 		if (event.needTotal !== false) {
 			const countRes = await query.count()
 			total = countRes.total || 0
 		}
-		
+
 		return {
 			success: true,
-			data: res.data,
-			total: total,
-			hasMore: res.data.length === pageSize
+			data,
+			total,
+			hasMore
 		}
 	} catch (e) {
 		console.error('获取列表失败', e)
@@ -76,7 +131,8 @@ exports.main = async (event, context) => {
 			success: false,
 			error: e.message,
 			data: [],
-			total: 0
+			total: 0,
+			hasMore: false
 		}
 	}
 }

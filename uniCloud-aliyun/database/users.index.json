@@ -1,0 +1,26 @@
+[
+  {
+    "IndexName": "openid_asc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "openid",
+          "Direction": "1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  },
+  {
+    "IndexName": "phone_asc",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "phone",
+          "Direction": "1"
+        }
+      ],
+      "MgoIsUnique": false
+    }
+  }
+]

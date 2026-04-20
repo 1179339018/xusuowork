@@ -1,57 +1,67 @@
-// 获取导航栏配置（胶囊按钮位置、状态栏高度等）
-export function getNavbarConfig() {
-  try {
-    // 获取系统信息
-    const systemInfo = uni.getSystemInfoSync();
-    
-    // 获取胶囊按钮位置信息
-    const menuButtonInfo = uni.getMenuButtonBoundingClientRect();
-    
-    // 状态栏高度
-    const statusBarHeight = systemInfo.statusBarHeight || 0;
-    
-    // 胶囊按钮高度
-    const menuButtonHeight = menuButtonInfo.height || 32;
-    
-    // 胶囊按钮距离顶部的距离
-    const menuButtonTop = menuButtonInfo.top || 0;
-    
-    // 计算导航栏总高度
-    // 导航栏高度 = 胶囊按钮高度 + (胶囊按钮顶部距离 - 状态栏高度) * 2
-    const navbarHeight = menuButtonHeight + (menuButtonTop - statusBarHeight) * 2;
-    
-    // 计算内容区域距离顶部的安全距离
-    // 安全距离 = 状态栏高度 + 导航栏高度
-    const safeAreaTop = statusBarHeight + navbarHeight;
-    
-    return {
-      statusBarHeight,
-      menuButtonHeight,
-      menuButtonTop,
-      navbarHeight,
-      safeAreaTop
-    };
-  } catch (error) {
-    console.error('获取导航栏配置失败:', error);
-    // 降级处理：使用默认值
-    return {
-      statusBarHeight: 44,
-      menuButtonHeight: 32,
-      menuButtonTop: 48,
-      navbarHeight: 88,
-      safeAreaTop: 132
-    };
+const DEFAULT_NAVBAR_CONFIG = {
+  statusBarHeight: 44,
+  menuButtonHeight: 32,
+  menuButtonTop: 48,
+  navbarHeight: 88,
+  safeAreaTop: 132
+}
+
+let cachedNavbarConfig = null
+
+function resolveNavbarConfig() {
+  const deviceInfo = typeof uni.getDeviceInfo === 'function' ? uni.getDeviceInfo() : {}
+  const windowInfo = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : {}
+  const appBaseInfo = typeof uni.getAppBaseInfo === 'function' ? uni.getAppBaseInfo() : {}
+  const menuButtonInfo = typeof uni.getMenuButtonBoundingClientRect === 'function'
+    ? uni.getMenuButtonBoundingClientRect()
+    : {}
+
+  const statusBarHeight =
+    windowInfo.statusBarHeight ||
+    appBaseInfo.statusBarHeight ||
+    deviceInfo.statusBarHeight ||
+    DEFAULT_NAVBAR_CONFIG.statusBarHeight
+
+  const menuButtonHeight = menuButtonInfo.height || DEFAULT_NAVBAR_CONFIG.menuButtonHeight
+  const menuButtonTop = menuButtonInfo.top || statusBarHeight + 8
+  const verticalInset = Math.max(menuButtonTop - statusBarHeight, 4)
+  const navbarHeight = menuButtonHeight + verticalInset * 2
+  const safeAreaTop = statusBarHeight + navbarHeight
+
+  return {
+    statusBarHeight,
+    menuButtonHeight,
+    menuButtonTop,
+    navbarHeight,
+    safeAreaTop
   }
 }
 
-// 获取CSS样式字符串，用于动态设置padding
-export function getNavbarStyle() {
-  const config = getNavbarConfig();
-  return `padding-top: ${config.safeAreaTop}px;`;
+export function getNavbarConfig(forceRefresh = false) {
+  if (!forceRefresh && cachedNavbarConfig) {
+    return cachedNavbarConfig
+  }
+
+  try {
+    cachedNavbarConfig = resolveNavbarConfig()
+  } catch (error) {
+    console.error('获取导航栏配置失败', error)
+    cachedNavbarConfig = { ...DEFAULT_NAVBAR_CONFIG }
+  }
+
+  return cachedNavbarConfig
 }
 
-// 获取导航栏高度样式
+export function resetNavbarConfigCache() {
+  cachedNavbarConfig = null
+}
+
+export function getNavbarStyle() {
+  const config = getNavbarConfig()
+  return `padding-top: ${config.safeAreaTop}px;`
+}
+
 export function getNavbarHeightStyle() {
-  const config = getNavbarConfig();
-  return `height: ${config.navbarHeight}px;`;
+  const config = getNavbarConfig()
+  return `height: ${config.navbarHeight}px;`
 }
