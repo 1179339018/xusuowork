@@ -28,17 +28,9 @@ const COMMUNITY_OPTIONS = Object.freeze([
   '其他'
 ])
 
-const SUPER_ADMIN_PHONE = '18926249923'
-
 function hasRole(user, role) {
-  if (!user) {
-    return false
-  }
-
-  if (user.role === role) {
-    return true
-  }
-
+  if (!user) return false
+  if (user.role === role) return true
   return Array.isArray(user.authorized_roles) && user.authorized_roles.includes(role)
 }
 
@@ -47,6 +39,5 @@ module.exports = {
   DISPUTE_STATUS,
   URGENCY_OPTIONS,
   COMMUNITY_OPTIONS,
-  SUPER_ADMIN_PHONE,
   hasRole
 }

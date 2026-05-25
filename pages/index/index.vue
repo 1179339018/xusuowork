@@ -299,6 +299,7 @@ import { computed, onMounted, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { getNavbarConfig } from '@/utils/navbar'
+import { callCloudFunction, settleTasks } from '@/utils/cloud'
 import {
   COMMUNITY_FILTER_OPTIONS,
   DISPUTE_STATUS,
@@ -395,14 +396,19 @@ const mapDispute = (item) => ({
 const hydrateCache = () => {
   const cachedStats = getPageCache(buildScopedKey('stats'), STATS_CACHE_AGE)
   const cachedRecent = getPageCache(buildScopedKey('recent'), RECENT_CACHE_AGE)
+  let hasCache = false
 
   if (cachedStats) {
     statistics.value = { ...statistics.value, ...cachedStats }
+    hasCache = true
   }
 
   if (Array.isArray(cachedRecent)) {
     recentDisputes.value = cachedRecent
+    hasCache = true
   }
+
+  return hasCache
 }
 
 const loadStatistics = async (force = false) => {
@@ -417,14 +423,11 @@ const loadStatistics = async (force = false) => {
     }
   }
 
-  const { result } = await uniCloud.callFunction({
-    name: 'getStatistics',
-    data: {
+  const { result } = await callCloudFunction('getStatistics', {
       role: userStore.role,
       openid: userStore.openid,
       community: userStore.community
-    }
-  })
+    }, { timeout: 8000 })
 
   if (!result?.success) {
     throw new Error(result?.error || '统计加载失败')
@@ -449,9 +452,7 @@ const loadRecentDisputes = async (force = false) => {
     }
   }
 
-  const { result } = await uniCloud.callFunction({
-    name: 'getDisputeList',
-    data: {
+  const { result } = await callCloudFunction('getDisputeList', {
       role: userStore.role,
       openid: userStore.openid,
       community: userStore.community,
@@ -460,8 +461,7 @@ const loadRecentDisputes = async (force = false) => {
       lite: true,
       needTotal: false,
       ...getRecentQuery()
-    }
-  })
+    }, { timeout: 8000 })
 
   if (!result?.success) {
     throw new Error(result?.error || '列表加载失败')
@@ -482,7 +482,7 @@ const refreshDashboard = async (force = false) => {
 
   refreshingDashboard.value = true
   try {
-    await Promise.all([
+    await settleTasks([
       loadStatistics(force),
       loadRecentDisputes(force)
     ])
@@ -576,9 +576,7 @@ const exportData = async () => {
     const exportPageSize = 100
 
     while (true) {
-      const { result } = await uniCloud.callFunction({
-        name: 'getDisputeList',
-        data: {
+      const { result } = await callCloudFunction('getDisputeList', {
           role: userStore.role,
           openid: userStore.openid,
           community: userStore.community,
@@ -590,8 +588,7 @@ const exportData = async () => {
           urgency: riskLevelOptions[riskLevelIndex.value] === FILTER_ALL ? '' : riskLevelOptions[riskLevelIndex.value],
           startDate: startDate.value,
           endDate: endDate.value
-        }
-      })
+        }, { timeout: 12000 })
 
       if (!result?.success) {
         throw new Error(result?.error || '导出失败')
@@ -655,9 +652,17 @@ const exportData = async () => {
 
 onMounted(async () => {
   initNavbar()
-  hydrateCache()
+  const hasCache = hydrateCache()
 
   if (userStore.isLogin) {
+    if (hasCache) {
+      hasInitialized.value = true
+      void refreshDashboard(false).catch((error) => {
+        console.error('首页后台刷新失败', error)
+      })
+      return
+    }
+
     isInitializing.value = true
     try {
       await refreshDashboard(false)

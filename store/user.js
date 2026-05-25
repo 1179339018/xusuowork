@@ -19,6 +19,7 @@ function createDefaultState() {
     name: '',
     phone: '',
     avatar: '',
+    sessionToken: '',
     community: '',
     authorized_roles: [],
     isLogin: false,
@@ -36,7 +37,7 @@ function normalizeUserInfo(userInfo = {}) {
     ...userInfo,
     role: userInfo.role || roles[0] || '',
     authorized_roles: roles,
-    isLogin: Boolean(userInfo.openid && (userInfo.role || roles[0])),
+    isLogin: Boolean(userInfo.openid && (userInfo.role || roles[0]) && userInfo.sessionToken),
     manuallyLoggedOut: Boolean(userInfo.manuallyLoggedOut)
   }
 }
@@ -49,7 +50,7 @@ export const useUserStore = defineStore('user', {
     isStreet: (state) => state.role === USER_ROLES.STREET,
     isCommunity: (state) => state.role === USER_ROLES.COMMUNITY,
     isAdmin: (state) => state.role === USER_ROLES.ADMIN,
-    hasSession: (state) => Boolean(state.openid && state.role),
+    hasSession: (state) => Boolean(state.openid && state.role && state.sessionToken),
     hasAuthorizedRoles: (state) => Array.isArray(state.authorized_roles) && state.authorized_roles.length > 0
   },
 
@@ -63,6 +64,7 @@ export const useUserStore = defineStore('user', {
           name: this.name,
           phone: this.phone,
           avatar: this.avatar,
+          sessionToken: this.sessionToken,
           community: this.community,
           authorized_roles: this.authorized_roles,
           isLogin: this.isLogin,
@@ -94,7 +96,7 @@ export const useUserStore = defineStore('user', {
       }
 
       const normalized = normalizeUserInfo(storedUser)
-      if (!normalized.openid || !normalized.role) {
+      if (!normalized.openid || !normalized.role || !normalized.sessionToken) {
         return false
       }
 

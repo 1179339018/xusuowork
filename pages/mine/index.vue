@@ -45,35 +45,8 @@
 
     <view class="panel-card">
       <view class="panel-header">
-        <text class="panel-title">常用功能</text>
-        <text class="panel-subtitle">统一入口，减少跳转成本</text>
-      </view>
-
-      <view v-if="false" class="quick-actions">
-        <view class="quick-action" @click="goToInput">
-          <view class="quick-action-icon quick-action-primary">
-            <image class="quick-action-image" src="/static/icons/icon-add.svg" mode="aspectFit" />
-          </view>
-          <text class="quick-action-text">快速录入</text>
-        </view>
-        <view class="quick-action" @click="goToTaskManage">
-          <view class="quick-action-icon quick-action-soft">
-            <image class="quick-action-image" src="/static/icons/mine-task-manage.svg" mode="aspectFit" />
-          </view>
-          <text class="quick-action-text">我的任务</text>
-        </view>
-        <view v-if="showStreetQuickAction" class="quick-action" @click="goToStreetManage">
-          <view class="quick-action-icon quick-action-soft">
-            <image class="quick-action-image" src="/static/icons/role-street.svg" mode="aspectFit" />
-          </view>
-          <text class="quick-action-text">街道管理</text>
-        </view>
-        <view v-if="showAdminQuickAction" class="quick-action" @click="goToUserManage">
-          <view class="quick-action-icon quick-action-soft">
-            <image class="quick-action-image" src="/static/icons/mine-user-manage.svg" mode="aspectFit" />
-          </view>
-          <text class="quick-action-text">用户管理</text>
-        </view>
+        <text class="panel-title">账户设置</text>
+        <text class="panel-subtitle">保留常用操作，移除无效入口和死代码</text>
       </view>
 
       <view class="menu-list">
@@ -123,7 +96,7 @@
             </view>
             <view class="menu-copy">
               <text class="menu-title">任务提醒订阅</text>
-              <text class="menu-desc">接收分派、回访等消息提醒</text>
+              <text class="menu-desc">接收分派、回访和状态变更提醒</text>
             </view>
           </view>
           <image class="menu-arrow" src="/static/icons/icon-arrow.svg" mode="aspectFit" />
@@ -131,22 +104,9 @@
       </view>
     </view>
 
-    <view v-if="false" class="panel-card guide-card">
-      <view class="panel-header">
-        <text class="panel-title">当前角色建议</text>
-        <text class="panel-subtitle">根据当前身份给出更直接的操作入口</text>
-      </view>
-
-      <view class="guide-body">
-        <text class="guide-title">{{ currentGuideTitle }}</text>
-        <text class="guide-desc">{{ currentGuideDesc }}</text>
-        <button class="guide-btn" @click="goToPrimaryWork">{{ currentGuideAction }}</button>
-      </view>
-    </view>
-
     <view class="panel-card quick-card">
       <view class="panel-header">
-        <text class="panel-title">账号状态</text>
+        <text class="panel-title">账户状态</text>
         <text class="panel-subtitle">当前账号基础信息概览</text>
       </view>
 
@@ -174,7 +134,8 @@ import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { USER_ROLES } from '@/utils/constants'
 import { getNavbarConfig } from '@/utils/navbar'
-import { getHomeTabByRole, getStreetTabByRole, getTaskTabByRole, switchTabWithFallback } from '@/utils/navigation'
+import { callCloudFunction } from '@/utils/cloud'
+import { getHomeTabByRole, getTaskTabByRole, switchTabWithFallback } from '@/utils/navigation'
 
 const userStore = useUserStore()
 const safeAreaTop = ref(0)
@@ -203,10 +164,6 @@ const canSwitchRole = computed(() => (
 ))
 
 const isAdmin = computed(() => userStore.role === USER_ROLES.ADMIN)
-const showStreetQuickAction = computed(() => (
-  userStore.role === USER_ROLES.STREET || userStore.role === USER_ROLES.ADMIN
-))
-const showAdminQuickAction = computed(() => userStore.role === USER_ROLES.ADMIN)
 
 const userInitial = computed(() => (
   userStore.name ? String(userStore.name).slice(0, 1) : 'U'
@@ -220,28 +177,6 @@ const roleCountLabel = computed(() => {
 const currentRoleIcon = computed(() => (
   roleIcons[userStore.role] || '/static/icons/role-admin.svg'
 ))
-const currentGuideTitle = computed(() => {
-  if (userStore.role === USER_ROLES.POLICE) return '适合先录入，再看任务进度'
-  if (userStore.role === USER_ROLES.STREET) return '适合先处理街道待分派事项'
-  if (userStore.role === USER_ROLES.COMMUNITY) return '适合先查看待回访与处理中任务'
-  if (userStore.role === USER_ROLES.ADMIN) return '适合先检查用户配置和全局任务流转'
-  return '当前账号可从常用功能开始'
-})
-
-const currentGuideDesc = computed(() => {
-  if (userStore.role === USER_ROLES.POLICE) return '新增纠纷后，可以直接去“我的任务”查看后续分派与处理情况。'
-  if (userStore.role === USER_ROLES.STREET) return '进入街道管理后，可以优先分派新纠纷，并跟踪处理中事项。'
-  if (userStore.role === USER_ROLES.COMMUNITY) return '进入任务页后，可以尽快补齐回访结果、备注和现场材料。'
-  if (userStore.role === USER_ROLES.ADMIN) return '优先检查用户、角色和社区归属，再进入任务页查看整体进度。'
-  return '可以从录入或任务页开始处理当前工作。'
-})
-
-const currentGuideAction = computed(() => {
-  if (userStore.role === USER_ROLES.STREET) return '进入街道管理'
-  if (userStore.role === USER_ROLES.ADMIN) return '进入用户管理'
-  if (userStore.role === USER_ROLES.POLICE) return '快速录入'
-  return '进入我的任务'
-})
 
 const handleAvatarClick = () => {
   if (!userStore.isLogin) {
@@ -291,13 +226,10 @@ const uploadAvatar = async () => {
       throw new Error('头像上传失败')
     }
 
-    const { result } = await uniCloud.callFunction({
-      name: 'updateUserInfo',
-      data: {
+    const { result } = await callCloudFunction('updateUserInfo', {
         openid: userStore.openid,
         avatar: fileID
-      }
-    })
+      }, { timeout: 8000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '头像更新失败')
@@ -335,13 +267,10 @@ const editName = () => {
 
       try {
         uni.showLoading({ title: '保存中...' })
-        const { result } = await uniCloud.callFunction({
-          name: 'updateUserInfo',
-          data: {
+        const { result } = await callCloudFunction('updateUserInfo', {
             openid: userStore.openid,
             name: nextName
-          }
-        })
+          }, { timeout: 8000 })
 
         if (!result?.success) {
           throw new Error(result?.error || '姓名更新失败')
@@ -387,35 +316,8 @@ const goToUserManage = () => {
   uni.navigateTo({ url: '/pages/admin/user-list' })
 }
 
-const goToStreetManage = () => {
-  switchTabWithFallback(getStreetTabByRole(userStore.role))
-}
-
 const goToTaskManage = () => {
   switchTabWithFallback(getTaskTabByRole())
-}
-
-const goToInput = () => {
-  switchTabWithFallback('/pages/input/index')
-}
-
-const goToPrimaryWork = () => {
-  if (userStore.role === USER_ROLES.STREET) {
-    goToStreetManage()
-    return
-  }
-
-  if (userStore.role === USER_ROLES.ADMIN) {
-    goToUserManage()
-    return
-  }
-
-  if (userStore.role === USER_ROLES.POLICE) {
-    goToInput()
-    return
-  }
-
-  goToTaskManage()
 }
 
 const subscribeMessage = () => {
@@ -611,91 +513,8 @@ onShow(() => {
   margin-bottom: 20rpx;
 }
 
-.guide-card {
-  padding-bottom: 20rpx;
-}
-
-.guide-body {
-  padding: 0 24rpx;
-}
-
-.guide-title {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #1f3150;
-}
-
-.guide-desc {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 23rpx;
-  line-height: 1.7;
-  color: #7c8fa7;
-}
-
-.guide-btn {
-  margin-top: 20rpx;
-  height: 82rpx;
-  line-height: 82rpx;
-  border-radius: 18rpx;
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
-  color: #fff;
-  font-size: 27rpx;
-  font-weight: 600;
-}
-
-.guide-btn::after {
-  border: none;
-}
-
 .panel-header {
   padding: 26rpx 28rpx 16rpx;
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
-  padding: 0 24rpx 18rpx;
-}
-
-.quick-action {
-  padding: 20rpx 18rpx;
-  border-radius: 22rpx;
-  background: #f7faff;
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.quick-action-icon {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.quick-action-primary {
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
-}
-
-.quick-action-soft {
-  background: #e8f1ff;
-}
-
-.quick-action-image {
-  width: 30rpx;
-  height: 30rpx;
-}
-
-.quick-action-text {
-  font-size: 26rpx;
-  color: #223754;
-  font-weight: 600;
 }
 
 .panel-title {

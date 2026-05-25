@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>矛盾纠纷管理系统项目说明</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #637083;
+      --line: #d9e1ec;
+      --paper: #ffffff;
+      --wash: #f3f6fa;
+      --blue: #1677ff;
+      --blue-soft: #e8f2ff;
+      --green: #18a058;
+      --green-soft: #e9f8ef;
+      --amber: #d9822b;
+      --amber-soft: #fff3df;
+      --red: #d64545;
+      --red-soft: #fff0f0;
+      --shadow: 0 18px 50px rgba(24, 42, 68, 0.09);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #eef5ff 0%, #f7f9fc 34%, #ffffff 100%);
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 42px 22px 72px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 28px;
+      align-items: stretch;
+      margin-bottom: 28px;
+    }
+
+    .hero-main,
+    .panel,
+    .role-card,
+    .flow-step,
+    .data-node,
+    .function-card,
+    .roadmap-item {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(20, 72, 130, 0.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-main {
+      padding: 38px;
+      min-height: 330px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      width: 360px;
+      height: 360px;
+      right: -120px;
+      top: -130px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(22, 119, 255, 0.18), rgba(22, 119, 255, 0));
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: #0d58c7;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      margin-top: 22px;
+      max-width: 720px;
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .hero-text {
+      margin-top: 18px;
+      max-width: 650px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.8;
+    }
+
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .metric {
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--wash);
+      border: 1px solid var(--line);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hero-side {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .mini-panel {
+      padding: 24px;
+      border-radius: var(--radius);
+      background: #142033;
+      color: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .mini-panel.light {
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid rgba(20, 72, 130, 0.08);
+    }
+
+    .mini-label {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+    }
+
+    .mini-panel.light .mini-label {
+      color: var(--muted);
+    }
+
+    .mini-title {
+      margin-top: 12px;
+      font-size: 27px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .mini-desc {
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .mini-panel.light .mini-desc {
+      color: var(--muted);
+    }
+
+    section {
+      margin-top: 28px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .section-desc {
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 620px;
+    }
+
+    .panel {
+      padding: 26px;
+    }
+
+    .architecture {
+      display: grid;
+      grid-template-columns: 1fr 80px 1fr 80px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .arch-column {
+      min-height: 310px;
+      padding: 22px;
+      border-radius: 16px;
+      background: var(--wash);
+      border: 1px solid var(--line);
+    }
+
+    .arch-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .pill {
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      color: #344155;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .arrow {
+      height: 2px;
+      background: linear-gradient(90deg, rgba(22, 119, 255, 0), var(--blue), rgba(22, 119, 255, 0));
+      position: relative;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -2px;
+      top: -5px;
+      border-left: 9px solid var(--blue);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+    }
+
+    .roles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .role-card {
+      padding: 22px;
+      min-height: 210px;
+    }
+
+    .role-icon {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: #fff;
+      font-weight: 900;
+      margin-bottom: 16px;
+    }
+
+    .role-card h3,
+    .function-card h3,
+    .data-node h3 {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .role-card p,
+    .function-card p,
+    .data-node p,
+    .roadmap-item p {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .blue {
+      background: var(--blue);
+    }
+
+    .green {
+      background: var(--green);
+    }
+
+    .amber {
+      background: var(--amber);
+    }
+
+    .red {
+      background: var(--red);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .flow-step {
+      padding: 20px;
+      position: relative;
+      min-height: 170px;
+    }
+
+    .step-index {
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--blue-soft);
+      color: #0d58c7;
+      font-weight: 900;
+      margin-bottom: 14px;
+    }
+
+    .flow-step h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .flow-step p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .flow-step::after {
+      content: "";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      width: 12px;
+      height: 2px;
+      background: var(--line);
+    }
+
+    .flow-step:last-child::after {
+      display: none;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .data-node {
+      padding: 22px;
+    }
+
+    .data-node.main {
+      border-color: rgba(22, 119, 255, 0.28);
+      background: linear-gradient(180deg, #ffffff 0%, #eef6ff 100%);
+    }
+
+    .field-list {
+      margin-top: 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .field {
+      padding: 9px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+      color: #334055;
+      font-size: 13px;
+    }
+
+    .function-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .function-card {
+      padding: 20px;
+    }
+
+    .tag {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .tag.auth {
+      color: #0d58c7;
+      background: var(--blue-soft);
+    }
+
+    .tag.biz {
+      color: #117545;
+      background: var(--green-soft);
+    }
+
+    .tag.admin {
+      color: #9a5b16;
+      background: var(--amber-soft);
+    }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .roadmap-item {
+      padding: 22px;
+    }
+
+    .priority {
+      display: inline-flex;
+      padding: 7px 11px;
+      border-radius: 10px;
+      font-weight: 900;
+      margin-bottom: 14px;
+    }
+
+    .p0 {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .p1 {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .p2 {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .note {
+      margin-top: 28px;
+      padding: 20px;
+      border-radius: var(--radius);
+      background: #142033;
+      color: rgba(255, 255, 255, 0.82);
+      line-height: 1.8;
+    }
+
+    .note strong {
+      color: #fff;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .architecture,
+      .data-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        width: 2px;
+        height: 46px;
+        justify-self: center;
+      }
+
+      .arrow::after {
+        right: -5px;
+        top: auto;
+        bottom: -2px;
+        border-top: 9px solid var(--blue);
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-bottom: none;
+      }
+
+      .roles,
+      .flow,
+      .function-grid,
+      .roadmap,
+      .hero-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .flow-step::after {
+        display: none;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        padding: 22px 14px 48px;
+      }
+
+      .hero-main {
+        padding: 26px;
+      }
+
+      .roles,
+      .flow,
+      .function-grid,
+      .roadmap,
+      .hero-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-desc {
+        margin-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-main">
+        <div>
+          <span class="eyebrow">项目说明 · 现代可视化版</span>
+          <h1>矛盾纠纷管理系统</h1>
+          <p class="hero-text">
+            一个面向基层治理的小程序，把纠纷录入、街道分派、社区回访、状态更新和操作留痕串成一条清晰的业务闭环。
+          </p>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric"><strong>4</strong><span>核心角色</span></div>
+          <div class="metric"><strong>10</strong><span>小程序页面</span></div>
+          <div class="metric"><strong>5</strong><span>核心数据表</span></div>
+          <div class="metric"><strong>18</strong><span>云函数模块</span></div>
+        </div>
+      </div>
+
+      <div class="hero-side">
+        <div class="mini-panel">
+          <div class="mini-label">主业务链路</div>
+          <div class="mini-title">发现纠纷到闭环处理</div>
+          <div class="mini-desc">录入后进入待分派，街道分派到社区，社区回访后更新状态并形成记录。</div>
+        </div>
+        <div class="mini-panel light">
+          <div class="mini-label">技术栈</div>
+          <div class="mini-title">uni-app + Vue 3 + Pinia + uniCloud</div>
+          <div class="mini-desc">前端负责页面与交互，云函数承载登录、查询、分派、回访和管理能力。</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>系统架构</h2>
+        <p class="section-desc">前端页面通过云函数访问数据库，Pinia 保存当前用户状态，utils 负责导航、缓存、分享和常量。</p>
+      </div>
+      <div class="panel architecture">
+        <div class="arch-column">
+          <div class="arch-title">小程序前端</div>
+          <div class="pill-list">
+            <span class="pill">启动页</span>
+            <span class="pill">登录页</span>
+            <span class="pill">首页</span>
+            <span class="pill">录入页</span>
+            <span class="pill">街道页</span>
+            <span class="pill">我的任务</span>
+            <span class="pill">详情页</span>
+            <span class="pill">用户管理</span>
+            <span class="pill">我的页</span>
+          </div>
+        </div>
+        <div class="arrow"></div>
+        <div class="arch-column">
+          <div class="arch-title">云函数服务</div>
+          <div class="pill-list">
+            <span class="pill">login</span>
+            <span class="pill">checkBind</span>
+            <span class="pill">getDisputeList</span>
+            <span class="pill">getDisputeDetail</span>
+            <span class="pill">pushToStreet</span>
+            <span class="pill">assignToCommunity</span>
+            <span class="pill">submitFeedback</span>
+            <span class="pill">adminManager</span>
+            <span class="pill">getStatistics</span>
+          </div>
+        </div>
+        <div class="arrow"></div>
+        <div class="arch-column">
+          <div class="arch-title">云数据库</div>
+          <div class="pill-list">
+            <span class="pill">users</span>
+            <span class="pill">disputes</span>
+            <span class="pill">feedbacks</span>
+            <span class="pill">logs</span>
+            <span class="pill">assignments</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>角色分工</h2>
+        <p class="section-desc">系统通过角色决定用户能看什么、能做什么。管理员负责配置，街道负责分派，社区负责回访。</p>
+      </div>
+      <div class="roles">
+        <div class="role-card">
+          <div class="role-icon blue">警</div>
+          <h3>派出所</h3>
+          <p>负责录入纠纷，查看自己录入事项的后续分派和处理进度。</p>
+        </div>
+        <div class="role-card">
+          <div class="role-icon amber">街</div>
+          <h3>街道</h3>
+          <p>查看待分派纠纷，选择社区承接任务，并跟踪整体处理进度。</p>
+        </div>
+        <div class="role-card">
+          <div class="role-icon green">社</div>
+          <h3>社区</h3>
+          <p>查看分派到本社区的任务，提交回访记录、处理措施和结果。</p>
+        </div>
+        <div class="role-card">
+          <div class="role-icon red">管</div>
+          <h3>管理员</h3>
+          <p>维护用户、角色和社区归属，查看全局数据和任务流转情况。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>纠纷流转</h2>
+        <p class="section-desc">一条纠纷从录入开始，经过街道分派和社区回访，最终进入已化解或继续跟进。</p>
+      </div>
+      <div class="flow">
+        <div class="flow-step">
+          <span class="step-index">1</span>
+          <h3>录入纠纷</h3>
+          <p>填写来源、社区、标题、描述、位置、风险等级等信息。</p>
+        </div>
+        <div class="flow-step">
+          <span class="step-index">2</span>
+          <h3>进入待分派</h3>
+          <p>系统写入 disputes 表，状态默认为待分派。</p>
+        </div>
+        <div class="flow-step">
+          <span class="step-index">3</span>
+          <h3>街道分派</h3>
+          <p>街道选择承接社区，记录分派信息和操作日志。</p>
+        </div>
+        <div class="flow-step">
+          <span class="step-index">4</span>
+          <h3>社区回访</h3>
+          <p>社区提交回访方式、措施、备注、照片或录音。</p>
+        </div>
+        <div class="flow-step">
+          <span class="step-index">5</span>
+          <h3>状态闭环</h3>
+          <p>根据回访结果变为已化解、处理中或继续待回访。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>数据关系</h2>
+        <p class="section-desc">disputes 是主表，users 决定身份，feedbacks、logs、assignments 记录处理过程。</p>
+      </div>
+      <div class="data-grid">
+        <div class="data-node">
+          <h3>users</h3>
+          <p>保存授权用户、openid、手机号、角色和社区归属。</p>
+          <div class="field-list">
+            <span class="field">openid</span>
+            <span class="field">phone</span>
+            <span class="field">authorized_roles</span>
+            <span class="field">community</span>
+          </div>
+        </div>
+        <div class="data-node main">
+          <h3>disputes</h3>
+          <p>纠纷主记录，承载状态流转、位置、风险等级和分派社区。</p>
+          <div class="field-list">
+            <span class="field">title / description</span>
+            <span class="field">status / urgency</span>
+            <span class="field">create_user</span>
+            <span class="field">assign_community</span>
+          </div>
+        </div>
+        <div class="data-node">
+          <h3>过程记录</h3>
+          <p>回访、分派和日志用于还原每一步操作。</p>
+          <div class="field-list">
+            <span class="field">feedbacks</span>
+            <span class="field">logs</span>
+            <span class="field">assignments</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>云函数分层</h2>
+        <p class="section-desc">云函数按登录、业务流转、管理统计三类组织，是后续安全和性能优化的重点。</p>
+      </div>
+      <div class="function-grid">
+        <div class="function-card">
+          <span class="tag auth">登录身份</span>
+          <h3>login / checkBind</h3>
+          <p>负责微信 code 换 openid、手机号绑定、启动时识别用户身份。</p>
+        </div>
+        <div class="function-card">
+          <span class="tag biz">纠纷业务</span>
+          <h3>push / assign / feedback</h3>
+          <p>负责新增纠纷、街道分派、社区回访和状态更新。</p>
+        </div>
+        <div class="function-card">
+          <span class="tag admin">管理统计</span>
+          <h3>adminManager / statistics</h3>
+          <p>负责用户管理、角色配置、首页和列表统计数据。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>后续优化路线</h2>
+        <p class="section-desc">下一步最值得做的是安全权限，其次是列表和详情性能，最后再做视觉统一。</p>
+      </div>
+      <div class="roadmap">
+        <div class="roadmap-item">
+          <span class="priority p0">P0 安全</span>
+          <h3>服务端权限收口</h3>
+          <p>详情、列表、录入、回访都应由云函数根据当前 openid 查询用户身份，再判断可见范围和操作权限。</p>
+        </div>
+        <div class="roadmap-item">
+          <span class="priority p1">P1 性能</span>
+          <h3>分页、索引、懒加载</h3>
+          <p>用户管理加分页，详情页回访和日志懒加载，确认 disputes 和 users 常用查询索引。</p>
+        </div>
+        <div class="roadmap-item">
+          <span class="priority p2">P2 体验</span>
+          <h3>页面视觉统一</h3>
+          <p>继续统一录入、详情、登录、分享页，让系统从能用走向稳定、清晰、专业。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="note">
+      <strong>一句话总结：</strong>
+      当前项目已经具备完整业务骨架，最重要的下一步不是继续堆功能，而是把权限、查询性能和页面结构继续收紧，让系统更接近企业级交付状态。
+    </div>
+  </main>
+</body>
+</html>

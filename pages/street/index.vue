@@ -61,10 +61,8 @@
     </view>
 
     <view class="focus-card">
-      <view class="focus-main">
-        <text class="focus-title">{{ focusTitle }}</text>
-        <text class="focus-desc">{{ focusDesc }}</text>
-      </view>
+      <text class="focus-title">{{ focusTitle }}</text>
+      <text class="focus-desc">{{ focusDesc }}</text>
     </view>
 
     <scroll-view
@@ -118,7 +116,7 @@
       <view v-else-if="!loading && disputeList.length === 0" class="empty-state">
         <view class="empty-mark"></view>
         <text class="empty-text">暂无相关纠纷</text>
-        <text class="empty-desc">可以尝试切换状态、清空关键词，或重新选择日期范围</text>
+        <text class="empty-desc">可以尝试切换状态、清空关键词，或重新选择日期</text>
         <view class="empty-actions">
           <button class="btn-secondary empty-btn" @click="resetFilters">重置筛选</button>
           <button class="btn-primary empty-btn" @click="refresh">重新加载</button>
@@ -130,7 +128,12 @@
       <view class="modal-card" @click.stop>
         <view class="modal-head">
           <text class="modal-title">分派纠纷</text>
-          <image class="modal-close" src="/static/icons/icon-close.svg" mode="aspectFit" @click="showAssign = false" />
+          <image
+            class="modal-close"
+            src="/static/icons/icon-close.svg"
+            mode="aspectFit"
+            @click="showAssign = false"
+          />
         </view>
 
         <view class="modal-body">
@@ -174,6 +177,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { getNavbarConfig } from '@/utils/navbar'
+import { callCloudFunction, settleTasks } from '@/utils/cloud'
 import {
   COMMUNITY_OPTIONS,
   DISPUTE_STATUS,
@@ -187,13 +191,6 @@ import { getTaskTabByRole } from '@/utils/navigation'
 
 const userStore = useUserStore()
 const safeAreaTop = ref(0)
-const statusTabs = [
-  FILTER_ALL,
-  DISPUTE_STATUS.PENDING_ASSIGN,
-  DISPUTE_STATUS.PENDING_VISIT,
-  DISPUTE_STATUS.PROCESSING,
-  DISPUTE_STATUS.RESOLVED
-]
 const currentStatus = ref(FILTER_ALL)
 const keyword = ref('')
 const startDate = ref('')
@@ -201,7 +198,6 @@ const disputeList = ref([])
 const loading = ref(false)
 const refreshing = ref(false)
 const page = ref(1)
-const pageSize = 10
 const hasMore = ref(true)
 const lastRefreshAt = ref(0)
 const isInitializing = ref(false)
@@ -214,7 +210,16 @@ const statistics = ref({
 const showAssign = ref(false)
 const assigning = ref(false)
 const currentDispute = ref(null)
+const pageSize = 10
 const communityOptions = COMMUNITY_OPTIONS
+const statusTabs = [
+  FILTER_ALL,
+  DISPUTE_STATUS.PENDING_ASSIGN,
+  DISPUTE_STATUS.PENDING_VISIT,
+  DISPUTE_STATUS.PROCESSING,
+  DISPUTE_STATUS.RESOLVED
+]
+
 const assignForm = reactive({
   communityId: '',
   communityName: '',
@@ -225,6 +230,11 @@ const assignForm = reactive({
 const CACHE_AGE = 60 * 1000
 const REFRESH_INTERVAL = 45 * 1000
 
+const initNavbar = () => {
+  const config = getNavbarConfig()
+  safeAreaTop.value = config.safeAreaTop
+}
+
 const ensureStreetAccess = () => {
   if (userStore.role === USER_ROLES.STREET || userStore.role === USER_ROLES.ADMIN) {
     return true
@@ -234,23 +244,15 @@ const ensureStreetAccess = () => {
   return false
 }
 
-const initNavbar = () => {
-  const config = getNavbarConfig()
-  safeAreaTop.value = config.safeAreaTop
-}
-
 const buildKey = (scope) => {
   const community = userStore.community || 'all'
   const openid = userStore.openid || 'anonymous'
   return `street:${scope}:${userStore.role}:${openid}:${community}:${currentStatus.value}:${keyword.value || 'all'}:${startDate.value || 'none'}`
 }
 
-const dateRangeText = computed(() => {
-  if (startDate.value) {
-    return startDate.value
-  }
-  return '筛选日期'
-})
+const dateRangeText = computed(() => (
+  startDate.value || '筛选日期'
+))
 
 const filterChips = computed(() => {
   const chips = []
@@ -270,7 +272,6 @@ const focusTitle = computed(() => {
   if (currentStatus.value === FILTER_ALL) {
     return `当前待分派 ${statistics.value.pendingAssign || 0} 条`
   }
-
   return `当前聚焦：${currentStatus.value}`
 })
 
@@ -278,19 +279,15 @@ const focusDesc = computed(() => {
   if (keyword.value.trim()) {
     return `已按关键词“${keyword.value.trim()}”筛选，适合集中处理当前查询结果。`
   }
-
   if (startDate.value) {
-    return `已限制日期范围，便于快速排查 ${dateRangeText.value} 的任务。`
+    return `已限定日期范围，便于快速排查 ${dateRangeText.value} 的任务。`
   }
-
   if (currentStatus.value === DISPUTE_STATUS.PENDING_ASSIGN) {
     return '优先处理待分派纠纷，尽快把任务下发到对应社区。'
   }
-
   if (currentStatus.value === DISPUTE_STATUS.PENDING_VISIT) {
     return '当前视图聚焦待回访事项，便于跟踪社区处理进度。'
   }
-
   return '街道页已按轻刷新模式运行，返回页面时只会在必要时更新数据。'
 })
 
@@ -298,13 +295,18 @@ const hydrateCache = () => {
   const statsKey = `street:stats:${userStore.role}:${userStore.openid || 'anonymous'}:${userStore.community || 'all'}`
   const cachedStats = getPageCache(statsKey, CACHE_AGE)
   const cachedList = getPageCache(buildKey('list'), CACHE_AGE)
+  let hasCache = false
 
   if (cachedStats) {
     statistics.value = { ...statistics.value, ...cachedStats }
+    hasCache = true
   }
   if (Array.isArray(cachedList)) {
     disputeList.value = cachedList
+    hasCache = true
   }
+
+  return hasCache
 }
 
 const loadStatistics = async (force = false) => {
@@ -316,14 +318,11 @@ const loadStatistics = async (force = false) => {
     }
   }
 
-  const { result } = await uniCloud.callFunction({
-    name: 'getStatistics',
-    data: {
+  const { result } = await callCloudFunction('getStatistics', {
       role: userStore.role,
       openid: userStore.openid,
       community: userStore.community
-    }
-  })
+    }, { timeout: 8000 })
 
   if (!result?.success) {
     throw new Error(result?.error || '统计加载失败')
@@ -356,9 +355,7 @@ const loadList = async ({ force = false, reset = false } = {}) => {
 
   loading.value = true
   try {
-    const { result } = await uniCloud.callFunction({
-      name: 'getDisputeList',
-      data: {
+    const { result } = await callCloudFunction('getDisputeList', {
         role: USER_ROLES.STREET,
         openid: userStore.openid,
         status: currentStatus.value === FILTER_ALL ? '' : currentStatus.value,
@@ -369,8 +366,7 @@ const loadList = async ({ force = false, reset = false } = {}) => {
         page: page.value,
         pageSize,
         needTotal: false
-      }
-    })
+      }, { timeout: 8000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '列表加载失败')
@@ -391,7 +387,7 @@ const loadList = async ({ force = false, reset = false } = {}) => {
 const refresh = async () => {
   refreshing.value = true
   try {
-    await Promise.all([
+    await settleTasks([
       loadStatistics(true),
       loadList({ force: true, reset: true })
     ])
@@ -463,9 +459,7 @@ const confirmAssign = async () => {
 
   assigning.value = true
   try {
-    const { result } = await uniCloud.callFunction({
-      name: 'assignToCommunity',
-      data: {
+    const { result } = await callCloudFunction('assignToCommunity', {
         disputeId: currentDispute.value._id,
         communityId: assignForm.communityId,
         remark: assignForm.remark,
@@ -473,8 +467,7 @@ const confirmAssign = async () => {
           openid: userStore.openid,
           name: userStore.name
         }
-      }
-    })
+      }, { timeout: 10000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '分派失败')
@@ -521,7 +514,15 @@ onMounted(async () => {
   }
 
   initNavbar()
-  hydrateCache()
+  const hasCache = hydrateCache()
+
+  if (hasCache) {
+    hasInitialized.value = true
+    void refresh().catch((error) => {
+      console.error('街道页后台刷新失败', error)
+    })
+    return
+  }
 
   isInitializing.value = true
   try {
@@ -570,7 +571,9 @@ onShow(async () => {
 
 .toolbar-card,
 .tabs-card,
+.filter-card,
 .stats-card,
+.focus-card,
 .list-card,
 .modal-card {
   background: rgba(255, 255, 255, 0.96);
@@ -587,7 +590,8 @@ onShow(async () => {
 }
 
 .search-shell,
-.date-trigger {
+.date-trigger,
+.picker-shell {
   min-height: 82rpx;
   border-radius: 18rpx;
   background: #f7faff;
@@ -602,22 +606,24 @@ onShow(async () => {
 }
 
 .date-trigger {
-  padding: 0 18rpx;
   min-width: 220rpx;
+  padding: 0 18rpx;
   justify-content: center;
   gap: 10rpx;
 }
 
-.toolbar-icon {
+.toolbar-icon,
+.picker-arrow,
+.modal-close {
   width: 28rpx;
   height: 28rpx;
 }
 
 .search-input {
   flex: 1;
+  margin-left: 12rpx;
   font-size: 27rpx;
   color: #20324b;
-  margin-left: 12rpx;
 }
 
 .date-text {
@@ -630,186 +636,189 @@ onShow(async () => {
   margin-bottom: 18rpx;
 }
 
+.tabs-scroll,
+.list-container {
+  flex: 1;
+}
+
+.tabs-wrap {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 0 20rpx;
+}
+
+.tab-item {
+  padding: 16rpx 26rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #55708f;
+  background: #f3f8ff;
+}
+
+.tab-item.active {
+  color: #fff;
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+}
+
 .filter-card {
   display: flex;
   align-items: center;
   gap: 14rpx;
-  margin-bottom: 18rpx;
   padding: 18rpx 20rpx;
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1rpx solid rgba(22, 119, 255, 0.08);
+  margin-bottom: 18rpx;
 }
 
-.filter-label {
-  flex-shrink: 0;
+.filter-label,
+.filter-clear {
   font-size: 24rpx;
-  color: #6c819b;
-}
-
-.filter-chips {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10rpx;
-}
-
-.filter-chip {
-  padding: 8rpx 14rpx;
-  border-radius: 999rpx;
-  background: #eef4ff;
-  color: #2d5fb8;
-  font-size: 22rpx;
+  color: #4b6787;
 }
 
 .filter-clear {
-  flex-shrink: 0;
-  font-size: 24rpx;
   color: #1677ff;
-  font-weight: 600;
 }
 
-.tabs-wrap {
+.filter-chips {
   display: flex;
-  gap: 12rpx;
-  padding: 0 18rpx;
+  gap: 10rpx;
+  flex: 1;
+  flex-wrap: wrap;
 }
 
-.tab-item {
-  padding: 14rpx 26rpx;
+.filter-chip {
+  padding: 8rpx 16rpx;
   border-radius: 999rpx;
-  background: #f4f8ff;
-  color: #5d7390;
-  font-size: 25rpx;
-  white-space: nowrap;
-}
-
-.tab-item.active {
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
-  color: #fff;
+  background: #edf4ff;
+  color: #2d4f73;
+  font-size: 22rpx;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14rpx;
   margin-bottom: 18rpx;
 }
 
-.focus-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-  padding: 22rpx 24rpx;
-  margin-bottom: 18rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1rpx solid rgba(22, 119, 255, 0.08);
+.stats-card {
+  padding: 24rpx 18rpx;
 }
 
-.focus-main {
-  flex: 1;
+.stats-card.warning {
+  background: linear-gradient(180deg, rgba(255, 247, 230, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.stats-card.success {
+  background: linear-gradient(180deg, rgba(240, 255, 244, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.stats-label {
+  display: block;
+  font-size: 22rpx;
+  color: #7790aa;
+}
+
+.stats-value {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #20324b;
+}
+
+.focus-card {
+  padding: 24rpx;
+  margin-bottom: 18rpx;
 }
 
 .focus-title {
   display: block;
   font-size: 30rpx;
   font-weight: 700;
-  color: #1f3150;
+  color: #20324b;
 }
 
 .focus-desc {
   display: block;
-  margin-top: 8rpx;
-  font-size: 23rpx;
-  line-height: 1.6;
-  color: #7c8fa7;
-}
-
-.stats-card {
-  padding: 24rpx 16rpx;
-  text-align: center;
-}
-
-.stats-card.warning .stats-value {
-  color: #fa8c16;
-}
-
-.stats-card.success .stats-value {
-  color: #52c41a;
-}
-
-.stats-label {
-  display: block;
-  font-size: 23rpx;
-  color: #7587a0;
-  margin-bottom: 8rpx;
-}
-
-.stats-value {
-  display: block;
-  font-size: 42rpx;
-  line-height: 1.1;
-  font-weight: 700;
-  color: #163052;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #6f85a0;
 }
 
 .list-container {
-  flex: 1;
-  height: 0;
+  min-height: 0;
 }
 
 .list-card {
-  padding: 26rpx;
-  margin-bottom: 18rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
 }
 
-.card-top {
+.card-top,
+.title-wrap,
+.info-row,
+.modal-head,
+.modal-actions,
+.picker-shell {
   display: flex;
+  align-items: center;
+}
+
+.card-top,
+.info-row,
+.modal-head,
+.modal-actions {
   justify-content: space-between;
-  gap: 14rpx;
-  margin-bottom: 18rpx;
 }
 
 .title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
   min-width: 0;
+  flex: 1;
+  gap: 12rpx;
 }
 
 .card-title {
-  font-size: 29rpx;
+  font-size: 30rpx;
   font-weight: 700;
-  color: #1f3150;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #223754;
 }
 
-.status-chip,
-.urgency-chip {
-  flex-shrink: 0;
-  padding: 6rpx 14rpx;
+.urgency-chip,
+.status-chip {
+  padding: 8rpx 14rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  font-weight: 600;
+}
+
+.tag-primary {
+  background: #edf4ff;
+  color: #1677ff;
+}
+
+.tag-warning {
+  background: #fff4de;
+  color: #d48806;
+}
+
+.tag-danger {
+  background: #fff0f0;
+  color: #cf1322;
 }
 
 .status-pending {
   background: #fff7e6;
-  color: #fa8c16;
+  color: #d48806;
 }
 
 .status-processing {
-  background: #e6f4ff;
+  background: #edf4ff;
   color: #1677ff;
 }
 
 .status-resolved {
   background: #f6ffed;
-  color: #52c41a;
+  color: #389e0d;
 }
 
 .status-closed {
@@ -817,183 +826,124 @@ onShow(async () => {
   color: #8c8c8c;
 }
 
-.tag-primary {
-  background: #e6f4ff;
-  color: #1677ff;
-}
-
-.tag-warning {
-  background: #fff7e6;
-  color: #fa8c16;
-}
-
-.tag-danger {
-  background: #fff1f0;
-  color: #ff4d4f;
-}
-
 .card-body {
-  background: #f7faff;
-  border-radius: 18rpx;
-  padding: 20rpx;
-}
-
-.info-row {
-  display: flex;
-  gap: 18rpx;
-  margin-bottom: 12rpx;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
+  margin-top: 18rpx;
+  display: grid;
+  gap: 12rpx;
 }
 
 .info-label {
   width: 72rpx;
-  flex-shrink: 0;
   font-size: 24rpx;
-  color: #7c8fa7;
+  color: #7b91aa;
 }
 
 .info-value {
   flex: 1;
-  font-size: 25rpx;
-  color: #24364f;
+  text-align: right;
+  font-size: 24rpx;
+  color: #223754;
 }
 
-.location {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.info-value.location {
+  max-width: 420rpx;
 }
 
 .card-action {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 18rpx;
+  margin-top: 18rpx;
 }
 
 .btn-assign,
 .btn-primary,
-.btn-secondary {
-  height: 80rpx;
-  line-height: 80rpx;
+.btn-secondary,
+.empty-btn {
+  height: 78rpx;
+  line-height: 78rpx;
   border-radius: 18rpx;
-  font-size: 28rpx;
-  font-weight: 600;
+  font-size: 26rpx;
 }
 
-.btn-assign::after,
-.btn-primary::after,
-.btn-secondary::after {
-  border: none;
-}
-
-.btn-assign,
-.btn-primary {
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
+.btn-primary,
+.btn-assign {
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   color: #fff;
 }
 
 .btn-secondary {
-  color: #3b5574;
-  background: #eef4ff;
+  background: #f6f9fd;
+  color: #305172;
+}
+
+.btn-primary::after,
+.btn-secondary::after,
+.btn-assign::after {
+  border: none;
+}
+
+.state-text,
+.empty-text,
+.empty-desc {
+  text-align: center;
 }
 
 .state-text {
-  text-align: center;
+  padding: 24rpx 0 36rpx;
   font-size: 24rpx;
-  color: #7c8fa7;
-  padding: 24rpx 0 40rpx;
+  color: #6f85a0;
 }
 
 .empty-state {
-  padding: 90rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  padding: 80rpx 24rpx 60rpx;
 }
 
 .empty-mark {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(135deg, #d6e7ff 0%, #eef5ff 100%);
-  margin-bottom: 18rpx;
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 20rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #edf4ff 0%, #f8fbff 100%);
 }
 
 .empty-text {
-  font-size: 28rpx;
-  color: #70839b;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #223754;
 }
 
 .empty-desc {
-  margin-top: 10rpx;
-  font-size: 23rpx;
-  line-height: 1.6;
-  color: #91a2b7;
-  text-align: center;
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #7790aa;
 }
 
 .empty-actions {
   display: flex;
   gap: 14rpx;
-  margin-top: 22rpx;
+  margin-top: 26rpx;
 }
 
 .empty-btn {
-  min-width: 170rpx;
-}
-
-@media (max-width: 520px) {
-  .toolbar-card,
-  .filter-card,
-  .focus-card,
-  .empty-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .date-trigger,
-  .filter-clear,
-  .empty-btn {
-    width: 100%;
-    text-align: center;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
+  flex: 1;
 }
 
 .modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(9, 24, 45, 0.38);
+  background: rgba(15, 35, 60, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32rpx;
+  padding: 30rpx;
   z-index: 999;
 }
 
 .modal-card {
   width: 100%;
-  max-width: 620rpx;
-  overflow: hidden;
-}
-
-.modal-head,
-.modal-actions {
-  padding: 24rpx 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-head {
-  border-bottom: 1rpx solid #edf3f8;
+  max-width: 680rpx;
+  padding: 28rpx;
 }
 
 .modal-title {
@@ -1002,64 +952,41 @@ onShow(async () => {
   color: #1f3150;
 }
 
-.modal-close {
-  font-size: 36rpx;
-  color: #8ba0ba;
-}
-
 .modal-body {
-  padding: 28rpx;
+  margin-top: 24rpx;
 }
 
-.form-row {
-  margin-bottom: 22rpx;
-}
-
-.form-row:last-child {
-  margin-bottom: 0;
+.form-row + .form-row {
+  margin-top: 18rpx;
 }
 
 .form-label {
   display: block;
-  font-size: 25rpx;
-  color: #62758c;
   margin-bottom: 12rpx;
-}
-
-.picker-shell,
-.remark-input {
-  width: 100%;
-  box-sizing: border-box;
-  border-radius: 18rpx;
-  background: #f7faff;
-  border: 1rpx solid #e6edf5;
-  font-size: 26rpx;
-  color: #20324b;
+  font-size: 24rpx;
+  color: #5a7492;
 }
 
 .picker-shell {
-  min-height: 84rpx;
-  padding: 0 20rpx;
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-.picker-arrow {
-  width: 28rpx;
-  height: 28rpx;
-  opacity: 0.72;
-  flex-shrink: 0;
+  padding: 0 20rpx;
 }
 
 .remark-input {
-  min-height: 150rpx;
-  padding: 18rpx 20rpx;
+  width: 100%;
+  min-height: 180rpx;
+  padding: 20rpx;
+  border-radius: 18rpx;
+  box-sizing: border-box;
+  background: #f7faff;
+  border: 1rpx solid #e6edf5;
+  font-size: 24rpx;
+  color: #223754;
 }
 
 .modal-actions {
-  gap: 16rpx;
-  border-top: 1rpx solid #edf3f8;
+  gap: 14rpx;
+  margin-top: 24rpx;
 }
 
 .modal-actions button {

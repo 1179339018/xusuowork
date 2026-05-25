@@ -1,7 +1,9 @@
 {
-	"name": "assignToCommunity",
-	"version": "1.0.0",
-	"description": "分派纠纷到社区",
-	"main": "index.js",
-	"dependencies": {}
+  "name": "assignToCommunity",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "app-constants": "file:../common/app-constants",
+    "auth-helper": "file:../common/auth-helper"
+  }
 }

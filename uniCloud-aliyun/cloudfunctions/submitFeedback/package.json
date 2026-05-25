@@ -1,7 +1,9 @@
 {
-	"name": "submitFeedback",
-	"version": "1.0.0",
-	"description": "提交回访记录",
-	"main": "index.js",
-	"dependencies": {}
+  "name": "submitFeedback",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "app-constants": "file:../common/app-constants",
+    "auth-helper": "file:../common/auth-helper"
+  }
 }

@@ -1,91 +1,49 @@
-'use strict';
+'use strict'
 
-const db = uniCloud.database()
-const dbCmd = db.command
-const { DISPUTE_STATUS, USER_ROLES, hasRole } = require('../common/app-constants')
+const { db, getCurrentUserFromEvent, canAssignDispute } = require('auth-helper')
+const { DISPUTE_STATUS } = require('app-constants')
 
 exports.main = async (event, context) => {
-	const { disputeId, communityId, remark, userInfo } = event
-	const requestOpenid = context.OPENID || context.openid || userInfo?.openid
+  const { disputeId, communityId, remark } = event
+  if (!disputeId || !communityId) return { success: false, error: '缺少必要参数' }
 
-	// 输入验证
-	if (!disputeId || !communityId || !requestOpenid) {
-		return {
-			success: false,
-			error: '缺少必要参数'
-		}
-	}
+  try {
+    const auth = await getCurrentUserFromEvent(event, context)
+    if (!auth.success) return auth
+    if (!canAssignDispute(auth.user)) return { success: false, error: '权限不足' }
 
-	try {
-		// 检查用户权限
-		const userRes = await db.collection('users').where({
-			openid: requestOpenid
-		}).get()
+    const disputeRes = await db.collection('disputes').doc(disputeId).get()
+    const dispute = disputeRes.data && disputeRes.data[0]
+    if (!dispute) return { success: false, error: '纠纷不存在' }
+    if (dispute.status !== DISPUTE_STATUS.PENDING_ASSIGN) return { success: false, error: '当前纠纷状态不允许重复分派' }
 
-		if (userRes.data.length === 0 || (!hasRole(userRes.data[0], USER_ROLES.STREET) && !hasRole(userRes.data[0], USER_ROLES.ADMIN))) {
-			return {
-				success: false,
-				error: '权限不足'
-			}
-		}
+    await db.collection('disputes').doc(disputeId).update({
+      status: DISPUTE_STATUS.PENDING_VISIT,
+      assign_community: communityId,
+      assign_time: new Date()
+    })
 
-		// 检查纠纷是否存在
-		const disputeRes = await db.collection('disputes').doc(disputeId).get()
-		if (disputeRes.data.length === 0) {
-			return {
-				success: false,
-				error: '纠纷不存在'
-			}
-		}
+    await db.collection('assignments').add({
+      dispute_id: disputeId,
+      community_id: communityId,
+      assign_user: auth.openid,
+      remark: remark || '',
+      assign_time: new Date()
+    })
 
-		const dispute = disputeRes.data[0]
-		if (dispute.status !== DISPUTE_STATUS.PENDING_ASSIGN) {
-			return {
-				success: false,
-				error: '当前纠纷状态不允许重复分派'
-			}
-		}
+    await db.collection('logs').add({
+      entity_id: disputeId,
+      entity_type: 'assignment',
+      action: 'assign',
+      user_id: auth.openid,
+      user_name: auth.user.name || '',
+      details: { community_id: communityId, remark: remark || '' },
+      timestamp: new Date()
+    })
 
-		// 更新纠纷状态
-		await db.collection('disputes').doc(disputeId).update({
-			status: DISPUTE_STATUS.PENDING_VISIT,
-			assign_community: communityId,
-			assign_time: new Date()
-		})
-
-		// 创建分派记录
-		await db.collection('assignments').add({
-			dispute_id: disputeId,
-			community_id: communityId,
-			assign_user: requestOpenid,
-			remark: remark || '',
-			assign_time: new Date()
-		})
-
-		// 记录日志
-		await db.collection('logs').add({
-			entity_id: disputeId,
-			entity_type: 'assignment',
-			action: 'assign',
-			user_id: requestOpenid,
-			user_name: userRes.data[0].name || userInfo?.name || '',
-			details: {
-				community_id: communityId,
-				remark: remark
-			},
-			timestamp: new Date()
-		})
-
-		// TODO: 发送模板消息通知社区
-
-		return {
-			success: true
-		}
-	} catch (e) {
-		console.error('分派失败', e)
-		return {
-			success: false,
-			error: e.message
-		}
-	}
+    return { success: true }
+  } catch (e) {
+    console.error('assignToCommunity failed', e)
+    return { success: false, error: '分派失败' }
+  }
 }

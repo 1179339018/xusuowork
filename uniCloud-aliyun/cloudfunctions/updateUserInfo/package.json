@@ -1,6 +1,8 @@
 {
   "name": "updateUserInfo",
   "version": "1.0.0",
-  "description": "更新用户信息",
-  "main": "index.js"
+  "main": "index.js",
+  "dependencies": {
+    "auth-helper": "file:../common/auth-helper"
+  }
 }

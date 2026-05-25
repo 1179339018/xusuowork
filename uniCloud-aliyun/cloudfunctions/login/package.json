@@ -1,7 +1,9 @@
 {
-	"name": "login",
-	"version": "1.0.0",
-	"description": "用户登录云函数",
-	"main": "index.js",
-	"dependencies": {}
+  "name": "login",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "session-helper": "file:../common/session-helper",
+    "wx-config": "file:../common/wx-config"
+  }
 }

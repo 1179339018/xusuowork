@@ -181,10 +181,6 @@
       </view>
 
       <view class="submit-bar">
-        <view class="submit-meta">
-          <text class="submit-title">确认后将推送到街道待分派</text>
-          <text class="submit-desc">{{ formSummaryText }}</text>
-        </view>
         <button class="submit-btn" :loading="submitting" :disabled="submitting" @click="submitForm">
           {{ submitting ? '提交中...' : '提交录入' }}
         </button>
@@ -198,6 +194,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { getNavbarConfig } from '@/utils/navbar'
+import { callCloudFunction } from '@/utils/cloud'
 import { COMMUNITY_OPTIONS, SOURCE_OPTIONS, URGENCY_DOT_CLASS_MAP, URGENCY_OPTIONS } from '@/utils/constants'
 import { clearPageCacheByPrefix } from '@/utils/page-cache'
 import { switchTabWithFallback } from '@/utils/navigation'
@@ -246,11 +243,6 @@ const requiredFieldHints = computed(() => ([
   { label: '发生位置', done: !!formData.location.address }
 ]))
 const isReadyToSubmit = computed(() => requiredFieldHints.value.every((item) => item.done))
-const formSummaryText = computed(() => {
-  const title = formData.title.trim() || '未填写标题'
-  const location = formData.location.address || '未选择位置'
-  return `${title} · ${location}`
-})
 
 const initNavbar = () => {
   const config = getNavbarConfig()
@@ -404,9 +396,7 @@ const submitForm = async () => {
 
   submitting.value = true
   try {
-    const { result } = await uniCloud.callFunction({
-      name: 'pushToStreet',
-      data: {
+    const { result } = await callCloudFunction('pushToStreet', {
         disputeData: {
           ...formData,
           title: formData.title.trim(),
@@ -417,8 +407,7 @@ const submitForm = async () => {
           openid: userStore.openid,
           name: userStore.name
         }
-      }
-    })
+      }, { timeout: 10000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '提交失败')
@@ -804,26 +793,8 @@ onShow(() => {
 .submit-bar {
   position: sticky;
   bottom: 0;
-  padding: 12rpx 0 24rpx;
+  padding: 18rpx 0 24rpx;
   background: linear-gradient(180deg, rgba(238, 244, 255, 0), #eef4ff 36%);
-}
-
-.submit-meta {
-  padding: 0 6rpx 14rpx;
-}
-
-.submit-title {
-  display: block;
-  font-size: 24rpx;
-  color: #1f3150;
-  font-weight: 600;
-}
-
-.submit-desc {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  color: #7b8ea6;
 }
 
 .submit-btn {

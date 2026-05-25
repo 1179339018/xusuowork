@@ -72,5 +72,3 @@ export const URGENCY_DOT_CLASS_MAP = Object.freeze({
   紧急: 'dot-urgent',
   特急: 'dot-emergency'
 })
-
-export const SUPER_ADMIN_PHONE = '18926249923'

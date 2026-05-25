@@ -42,9 +42,9 @@
     },
     "quickapp" : {},
     "mp-weixin" : {
-        "appid" : "wxcf7e4bb93311f1c0",
+        "appid" : null,
         "setting" : {
-            "urlCheck" : false,
+            "urlCheck" : true,
             "es6" : true,
             "enhance" : true,
             "postcss" : true,
@@ -59,7 +59,7 @@
             "uglifyFileName" : false,
             "checkInvalidKey" : true,
             "checkSiteMap" : true,
-            "uploadWithSourceMap" : true,
+            "uploadWithSourceMap" : false,
             "compileHotReLoad" : false,
             "lazyloadPlaceholderEnable" : false,
             "useMultiFrameRuntime" : true,
@@ -72,7 +72,7 @@
             },
             "enableEngineNative" : false,
             "useIsolateContext" : true,
-            "userConfirmedPrivacyRules" : false,
+            "userConfirmedPrivacyRules" : true,
             "minifyWXSS" : true,
             "showES6CompileOption" : false,
             "useCompilerPlugins" : false

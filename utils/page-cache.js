@@ -1,5 +1,6 @@
 const CACHE_PREFIX = 'page_cache:'
 const DIRTY_PREFIX = 'page_cache_dirty:'
+const MAX_CACHE_ENTRIES = 80
 
 function buildKey(key) {
   return `${CACHE_PREFIX}${key}`
@@ -29,12 +30,40 @@ export function getPageCache(key, maxAge = 0) {
 
 export function setPageCache(key, value) {
   try {
+    trimPageCache()
     uni.setStorageSync(buildKey(key), {
       value,
       timestamp: Date.now()
     })
   } catch (error) {
     // Ignore cache write failures and keep the UI responsive.
+  }
+}
+
+function trimPageCache() {
+  try {
+    const { keys = [] } = uni.getStorageInfoSync()
+    const cacheKeys = keys.filter((key) => typeof key === 'string' && key.startsWith(CACHE_PREFIX))
+
+    if (cacheKeys.length < MAX_CACHE_ENTRIES) {
+      return
+    }
+
+    const sortedKeys = cacheKeys
+      .map((key) => {
+        const payload = uni.getStorageSync(key)
+        return {
+          key,
+          timestamp: Number(payload?.timestamp || 0)
+        }
+      })
+      .sort((a, b) => a.timestamp - b.timestamp)
+
+    sortedKeys.slice(0, cacheKeys.length - MAX_CACHE_ENTRIES + 1).forEach((item) => {
+      uni.removeStorageSync(item.key)
+    })
+  } catch (error) {
+    // Cache trimming must never block normal page rendering.
   }
 }
 

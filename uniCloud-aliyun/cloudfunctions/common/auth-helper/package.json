@@ -1,0 +1,8 @@
+{
+  "name": "auth-helper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "app-constants": "file:../app-constants"
+  }
+}

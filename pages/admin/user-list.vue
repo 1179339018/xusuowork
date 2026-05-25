@@ -15,7 +15,7 @@
             <image class="summary-icon-image" src="/static/icons/mine-user-manage.svg" mode="aspectFit" />
           </view>
           <view class="summary-copy">
-            <text class="summary-number">{{ userList.length }}</text>
+            <text class="summary-number">{{ totalUserCount || userList.length }}</text>
             <text class="summary-text">当前已配置用户</text>
           </view>
         </view>
@@ -90,7 +90,13 @@
         </view>
       </view>
 
-      <view v-else class="empty-state">
+      <view v-if="userList.length > 0 && hasMoreUsers" class="load-more-row">
+        <button class="btn-secondary load-more-btn" :disabled="syncing" @click="loadMoreUsers">
+          {{ syncing ? '加载中...' : '加载更多用户' }}
+        </button>
+      </view>
+
+      <view v-if="filteredUserList.length === 0" class="empty-state">
         <view class="empty-mark"></view>
         <text class="empty-text">{{ userList.length > 0 ? '没有匹配的用户' : '暂无用户数据' }}</text>
       </view>
@@ -138,7 +144,7 @@
               >
                 <image class="role-option-icon" :src="getRoleIcon(role)" mode="aspectFit" />
                 <text class="role-option-text">{{ role }}</text>
-                <text v-if="form.roles.includes(role)" class="role-check">✓</text>
+                <text v-if="form.roles.includes(role)" class="role-check">已选</text>
               </view>
             </view>
           </view>
@@ -171,11 +177,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { getNavbarConfig } from '@/utils/navbar'
-import { COMMUNITY_OPTIONS, USER_ROLES, USER_ROLE_OPTIONS, SUPER_ADMIN_PHONE } from '@/utils/constants'
+import { callCloudFunction } from '@/utils/cloud'
+import { COMMUNITY_OPTIONS, USER_ROLES, USER_ROLE_OPTIONS } from '@/utils/constants'
 import { clearPageCacheByPrefix, getPageCache, getPageCacheDirtyAt, setPageCache } from '@/utils/page-cache'
 
 const userStore = useUserStore()
@@ -186,6 +193,11 @@ const safeAreaTop = ref(0)
 const lastRefreshAt = ref(0)
 const syncing = ref(false)
 const keyword = ref('')
+const userPage = ref(1)
+const userPageSize = 50
+const totalUserCount = ref(0)
+const hasMoreUsers = ref(false)
+let searchTimer = null
 
 const roleOptions = USER_ROLE_OPTIONS
 const communityChoices = COMMUNITY_OPTIONS
@@ -209,7 +221,6 @@ const form = reactive({
   community: ''
 })
 
-const isSuperAdmin = computed(() => userStore.phone === SUPER_ADMIN_PHONE)
 const boundUserCount = computed(() => userList.value.filter((item) => !!item.openid).length)
 const communityUserCount = computed(() => (
   userList.value.filter((item) => getUserRoles(item).includes(USER_ROLES.COMMUNITY)).length
@@ -230,7 +241,9 @@ const filteredUserList = computed(() => {
   })
 })
 
-const buildUserListCacheKey = () => `admin:user-list:${userStore.openid || 'anonymous'}`
+const buildUserListCacheKey = (search = keyword.value) => (
+  `admin:user-list:${userStore.openid || 'anonymous'}:${String(search || 'all').trim()}`
+)
 
 const initNavbar = () => {
   const config = getNavbarConfig()
@@ -266,17 +279,29 @@ const getRoleClass = (role) => {
 const getRoleIcon = (role) => roleIconMap[role] || '/static/icons/role-admin.svg'
 
 const hydrateCache = () => {
-  const cachedList = getPageCache(buildUserListCacheKey(), CACHE_AGE)
+  const cached = getPageCache(buildUserListCacheKey(), CACHE_AGE)
+  const cachedList = Array.isArray(cached) ? cached : cached?.list
   if (Array.isArray(cachedList)) {
     userList.value = cachedList.map(normalizeUser)
+    totalUserCount.value = Number(cached?.total || cachedList.length)
+    hasMoreUsers.value = Boolean(cached?.hasMore)
+    userPage.value = Number(cached?.page || 1)
     lastRefreshAt.value = Date.now()
   }
 }
 
-const persistUserList = (nextList) => {
+const persistUserList = (nextList, meta = {}) => {
   const normalized = nextList.map(normalizeUser)
   userList.value = normalized
-  setPageCache(buildUserListCacheKey(), normalized)
+  totalUserCount.value = Number(meta.total ?? (totalUserCount.value || normalized.length))
+  hasMoreUsers.value = Boolean(meta.hasMore ?? hasMoreUsers.value)
+  userPage.value = Number(meta.page || userPage.value || 1)
+  setPageCache(buildUserListCacheKey(), {
+    list: normalized,
+    total: totalUserCount.value,
+    hasMore: hasMoreUsers.value,
+    page: userPage.value
+  })
   lastRefreshAt.value = Date.now()
 }
 
@@ -303,21 +328,28 @@ const mergeUserIntoList = (nextUser) => {
   persistUserList(
     exists
       ? userList.value.map((item) => (item._id === normalized._id ? normalized : item))
-      : [normalized, ...userList.value]
+      : [normalized, ...userList.value],
+    {
+      total: exists ? totalUserCount.value : totalUserCount.value + 1
+    }
   )
 }
 
-const loadUserList = async (force = false, { silent = false } = {}) => {
+const loadUserList = async (force = false, { silent = false, append = false } = {}) => {
   if (syncing.value) {
     return
   }
 
   let hasCachedList = userList.value.length > 0
-  if (!force) {
+  if (!force && !append) {
     const cachedList = getPageCache(buildUserListCacheKey(), CACHE_AGE)
-    if (Array.isArray(cachedList)) {
-      userList.value = cachedList.map(normalizeUser)
-      hasCachedList = cachedList.length > 0
+    const cacheRows = Array.isArray(cachedList) ? cachedList : cachedList?.list
+    if (Array.isArray(cacheRows)) {
+      userList.value = cacheRows.map(normalizeUser)
+      totalUserCount.value = Number(cachedList?.total || cacheRows.length)
+      hasMoreUsers.value = Boolean(cachedList?.hasMore)
+      userPage.value = Number(cachedList?.page || 1)
+      hasCachedList = cacheRows.length > 0
     }
   }
 
@@ -327,30 +359,43 @@ const loadUserList = async (force = false, { silent = false } = {}) => {
 
   syncing.value = true
   try {
-    const { result } = await uniCloud.callFunction({
-      name: 'adminManager',
-      data: {
+    const nextPage = append ? userPage.value + 1 : 1
+    const { result } = await callCloudFunction('adminManager', {
         action: 'getUserList',
         params: {
-          operatorOpenid: userStore.openid
+          page: nextPage,
+          pageSize: userPageSize,
+          keyword: keyword.value.trim()
         }
-      }
-    })
+      }, { timeout: 8000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '加载失败')
     }
 
-    persistUserList((result.data || []).map(normalizeUser))
+    const incoming = (result.data || []).map(normalizeUser)
+    const merged = append ? [...userList.value, ...incoming] : incoming
+    persistUserList(merged, {
+      total: result.total,
+      hasMore: merged.length < Number(result.total || 0),
+      page: nextPage
+    })
   } catch (error) {
     console.error('加载用户列表失败', error)
     uni.showToast({ title: error.message || '加载失败', icon: 'none' })
   } finally {
     syncing.value = false
-    if (!silent) {
+    if (!silent && !hasCachedList) {
       uni.hideLoading()
     }
   }
+}
+
+const loadMoreUsers = () => {
+  if (!hasMoreUsers.value || syncing.value) {
+    return
+  }
+  void loadUserList(true, { silent: true, append: true })
 }
 
 const resetForm = () => {
@@ -401,7 +446,7 @@ const onCommunityPick = (e) => {
 
 const canDelete = (item) => {
   if (getUserRoles(item).includes(USER_ROLES.ADMIN)) {
-    return isSuperAdmin.value
+    return false
   }
   return true
 }
@@ -432,22 +477,20 @@ const submitForm = async () => {
       params.userId = form.id
     }
 
-    const { result } = await uniCloud.callFunction({
-      name: 'adminManager',
-      data: { action, params }
-    })
+    const { result } = await callCloudFunction('adminManager', {
+      action,
+      params
+    }, { timeout: 8000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '操作失败')
     }
 
     uni.showToast({ title: isEdit.value ? '更新成功' : '添加成功', icon: 'success' })
-
     const returnedUser = result.data || buildUserFromForm(
       userList.value.find((item) => item._id === form.id) || {}
     )
     mergeUserIntoList(returnedUser)
-
     invalidateRelatedCaches()
     closeModal()
   } catch (error) {
@@ -469,16 +512,13 @@ const unbindWechat = (item) => {
 
       uni.showLoading({ title: '处理中...' })
       try {
-        const { result } = await uniCloud.callFunction({
-          name: 'adminManager',
-          data: {
+        const { result } = await callCloudFunction('adminManager', {
             action: 'unbindWechat',
             params: {
               operatorOpenid: userStore.openid,
               userId: item._id
             }
-          }
-        })
+          }, { timeout: 8000 })
 
         if (!result?.success) {
           throw new Error(result?.error || '解绑失败')
@@ -509,16 +549,13 @@ const deleteUser = (item) => {
 
       uni.showLoading({ title: '删除中...' })
       try {
-        const { result } = await uniCloud.callFunction({
-          name: 'adminManager',
-          data: {
+        const { result } = await callCloudFunction('adminManager', {
             action: 'deleteUser',
             params: {
               operatorOpenid: userStore.openid,
               userId: item._id
             }
-          }
-        })
+          }, { timeout: 8000 })
 
         if (!result?.success) {
           throw new Error(result?.error || '删除失败')
@@ -526,7 +563,9 @@ const deleteUser = (item) => {
 
         uni.showToast({ title: '删除成功', icon: 'success' })
         const deletedUserId = result.data?.userId || item._id
-        persistUserList(userList.value.filter((user) => user._id !== deletedUserId))
+        persistUserList(userList.value.filter((user) => user._id !== deletedUserId), {
+          total: Math.max(totalUserCount.value - 1, 0)
+        })
         invalidateRelatedCaches()
       } catch (error) {
         console.error('删除失败', error)
@@ -541,6 +580,19 @@ const deleteUser = (item) => {
 const goBack = () => {
   uni.navigateBack({ delta: 1 })
 }
+
+watch(keyword, () => {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+
+  searchTimer = setTimeout(() => {
+    userPage.value = 1
+    void loadUserList(true, {
+      silent: userList.value.length > 0
+    })
+  }, 300)
+})
 
 onMounted(() => {
   initNavbar()
@@ -595,7 +647,6 @@ onShow(() => {
 .back-icon {
   width: 28rpx;
   height: 28rpx;
-  display: block;
   transform: rotate(180deg);
 }
 
@@ -616,6 +667,8 @@ onShow(() => {
 }
 
 .summary-card,
+.mini-stat,
+.toolbar-card,
 .user-card,
 .modal-card {
   background: rgba(255, 255, 255, 0.96);
@@ -633,6 +686,84 @@ onShow(() => {
   gap: 20rpx;
 }
 
+.summary-main,
+.identity-wrap,
+.user-top,
+.modal-actions,
+.role-pill,
+.picker-shell {
+  display: flex;
+  align-items: center;
+}
+
+.summary-main,
+.identity-wrap {
+  gap: 18rpx;
+}
+
+.summary-icon {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #edf4ff 0%, #f7fbff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary-icon-image {
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.summary-number {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #20324b;
+}
+
+.summary-text {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  color: #7790aa;
+}
+
+.add-btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.row-btn {
+  height: 78rpx;
+  line-height: 78rpx;
+  border-radius: 18rpx;
+  font-size: 26rpx;
+}
+
+.add-btn,
+.btn-primary {
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #f7faff;
+  color: #305172;
+}
+
+.btn-danger {
+  background: #fff1f0;
+  color: #cf1322;
+}
+
+.add-btn::after,
+.btn-primary::after,
+.btn-secondary::after,
+.btn-danger::after {
+  border: none;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -640,164 +771,94 @@ onShow(() => {
   margin-bottom: 18rpx;
 }
 
-.mini-stat,
-.toolbar-card {
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 22rpx;
-  border: 1rpx solid rgba(22, 119, 255, 0.08);
-  box-shadow: 0 10rpx 24rpx rgba(22, 119, 255, 0.08);
-}
-
 .mini-stat {
   padding: 22rpx 18rpx;
-  text-align: center;
 }
 
 .mini-stat__label {
   display: block;
   font-size: 22rpx;
-  color: #7d90a7;
-  margin-bottom: 8rpx;
+  color: #7790aa;
 }
 
 .mini-stat__value {
   display: block;
+  margin-top: 10rpx;
   font-size: 34rpx;
   font-weight: 700;
-  color: #1f3150;
+  color: #20324b;
 }
 
 .toolbar-card {
-  padding: 18rpx;
+  padding: 20rpx;
   margin-bottom: 18rpx;
 }
 
-.search-shell {
+.search-shell,
+.form-input,
+.picker-shell {
   min-height: 82rpx;
-  display: flex;
-  align-items: center;
   border-radius: 18rpx;
   background: #f7faff;
   border: 1rpx solid #e6edf5;
+  display: flex;
+  align-items: center;
+}
+
+.search-shell {
   padding: 0 20rpx;
 }
 
-.search-icon {
+.search-icon,
+.picker-arrow {
   width: 28rpx;
   height: 28rpx;
-  flex-shrink: 0;
 }
 
 .search-input {
   flex: 1;
   margin-left: 12rpx;
-  font-size: 26rpx;
-  color: #213450;
-}
-
-.summary-main {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-}
-
-.summary-icon {
-  width: 78rpx;
-  height: 78rpx;
-  border-radius: 22rpx;
-  background: #eef4ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.summary-icon-image {
-  width: 38rpx;
-  height: 38rpx;
-}
-
-.summary-copy {
-  display: flex;
-  flex-direction: column;
-}
-
-.summary-number {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #1f3150;
-}
-
-.summary-text {
-  font-size: 24rpx;
-  color: #7488a0;
-}
-
-.add-btn,
-.btn-primary,
-.btn-secondary,
-.btn-danger {
-  height: 80rpx;
-  line-height: 80rpx;
-  border-radius: 18rpx;
   font-size: 27rpx;
-  font-weight: 600;
-
-  &::after {
-    border: none;
-  }
-}
-
-.add-btn,
-.btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
-}
-
-.btn-secondary {
-  color: #395371;
-  background: #eef4ff;
-}
-
-.btn-danger {
-  color: #ff4d4f;
-  background: #fff2f0;
+  color: #20324b;
 }
 
 .user-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18rpx;
-}
-
-.user-card {
-  padding: 26rpx;
-}
-
-.user-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 18rpx;
-  margin-bottom: 20rpx;
-}
-
-.identity-wrap {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 16rpx;
 }
 
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 24rpx 0 8rpx;
+}
+
+.load-more-btn {
+  min-width: 240rpx;
+  padding: 0 28rpx;
+}
+
+.user-card {
+  padding: 24rpx;
+}
+
+.user-top {
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
 .avatar {
-  width: 88rpx;
-  height: 88rpx;
+  width: 92rpx;
+  height: 92rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
+  overflow: hidden;
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 34rpx;
   font-weight: 700;
-  overflow: hidden;
 }
 
 .avatar-image {
@@ -806,93 +867,79 @@ onShow(() => {
 }
 
 .identity-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+  min-width: 0;
 }
 
 .user-name {
+  display: block;
   font-size: 30rpx;
   font-weight: 700;
-  color: #1f3150;
+  color: #223754;
 }
 
 .user-phone {
-  font-size: 24rpx;
-  color: #7488a0;
+  display: block;
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  color: #7d90a7;
 }
 
 .bind-tag {
-  align-self: flex-start;
-  padding: 8rpx 16rpx;
+  padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  background: #f5f5f5;
-  color: #8c8c8c;
   font-size: 22rpx;
-  font-weight: 600;
+  color: #8c8c8c;
+  background: #f5f5f5;
 }
 
 .bind-tag.active {
-  background: #f6ffed;
-  color: #52c41a;
+  color: #1677ff;
+  background: #edf4ff;
 }
 
 .role-panel {
-  background: #f7faff;
-  border-radius: 20rpx;
-  padding: 18rpx 20rpx;
-  margin-bottom: 18rpx;
+  margin-top: 20rpx;
 }
 
-.community-text {
-  display: block;
-  margin-top: 12rpx;
-  font-size: 23rpx;
-  color: #6f849d;
-}
-
-.panel-label,
-.form-label {
+.panel-label {
   display: block;
   font-size: 24rpx;
-  color: #62758c;
-  margin-bottom: 12rpx;
+  color: #6b839e;
 }
 
 .role-list {
   display: flex;
-  flex-wrap: wrap;
   gap: 10rpx;
+  flex-wrap: wrap;
+  margin-top: 12rpx;
 }
 
 .role-pill {
-  display: inline-flex;
-  align-items: center;
   gap: 8rpx;
-  padding: 8rpx 14rpx;
+  padding: 10rpx 16rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  font-weight: 600;
 }
 
-.role-icon {
-  width: 20rpx;
-  height: 20rpx;
+.role-icon,
+.role-option-icon {
+  width: 24rpx;
+  height: 24rpx;
 }
 
 .role-admin {
   background: #fff7e6;
-  color: #fa8c16;
+  color: #d48806;
 }
 
 .role-street {
-  background: #e6f4ff;
+  background: #edf4ff;
   color: #1677ff;
 }
 
 .role-community {
   background: #f6ffed;
-  color: #52c41a;
+  color: #389e0d;
 }
 
 .role-police {
@@ -900,61 +947,57 @@ onShow(() => {
   color: #722ed1;
 }
 
+.community-text {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 23rpx;
+  color: #6f85a0;
+}
+
 .action-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 12rpx;
+  margin-top: 22rpx;
 }
 
 .row-btn {
-  width: 100%;
+  flex: 1;
 }
 
 .empty-state {
-  padding: 96rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  padding: 80rpx 24rpx 60rpx;
+  text-align: center;
 }
 
 .empty-mark {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(135deg, #d6e7ff 0%, #eef5ff 100%);
-  margin-bottom: 18rpx;
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 20rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #edf4ff 0%, #f8fbff 100%);
 }
 
 .empty-text {
-  font-size: 28rpx;
-  color: #70839b;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #223754;
 }
 
 .modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(9, 24, 45, 0.38);
+  background: rgba(15, 35, 60, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32rpx;
+  padding: 30rpx;
   z-index: 999;
 }
 
 .modal-card {
   width: 100%;
-  max-width: 640rpx;
-  overflow: hidden;
-}
-
-.modal-head,
-.modal-actions {
-  padding: 24rpx 28rpx;
-}
-
-.modal-head {
-  border-bottom: 1rpx solid #edf3f8;
+  max-width: 680rpx;
+  padding: 28rpx;
 }
 
 .modal-title {
@@ -962,111 +1005,87 @@ onShow(() => {
   font-size: 30rpx;
   font-weight: 700;
   color: #1f3150;
-  margin-bottom: 8rpx;
 }
 
 .modal-subtitle {
   display: block;
-  font-size: 23rpx;
-  color: #7b8ea6;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #7c8fa7;
 }
 
 .modal-body {
-  padding: 28rpx;
+  margin-top: 24rpx;
 }
 
-.form-row {
-  margin-bottom: 22rpx;
+.form-row + .form-row {
+  margin-top: 18rpx;
 }
 
-.form-row:last-child {
-  margin-bottom: 0;
+.form-label {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #5a7492;
 }
 
 .form-input {
   width: 100%;
-  min-height: 84rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
-  border-radius: 18rpx;
-  background: #f7faff;
-  border: 1rpx solid #e6edf5;
-  padding: 0 20rpx;
-  font-size: 26rpx;
-  color: #20324b;
-}
-
-.picker-shell {
-  min-height: 84rpx;
-  border-radius: 18rpx;
-  background: #f7faff;
-  border: 1rpx solid #e6edf5;
-  padding: 0 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 26rpx;
-  color: #20324b;
-}
-
-.picker-shell .placeholder {
-  color: #93a5ba;
-}
-
-.picker-arrow {
-  width: 28rpx;
-  height: 28rpx;
-  opacity: 0.72;
-  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #223754;
 }
 
 .role-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
 }
 
 .role-option {
-  min-height: 88rpx;
-  border-radius: 18rpx;
-  background: #f7faff;
+  position: relative;
+  padding: 18rpx;
+  border-radius: 20rpx;
   border: 1rpx solid #e6edf5;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 0 18rpx;
+  background: #f9fbff;
 }
 
 .role-option.selected {
-  background: #eef4ff;
-  border-color: #b7d0ff;
-}
-
-.role-option-icon {
-  width: 24rpx;
-  height: 24rpx;
+  border-color: #91caff;
+  background: #edf4ff;
 }
 
 .role-option-text {
-  flex: 1;
-  font-size: 25rpx;
-  color: #20324b;
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #223754;
 }
 
 .role-check {
-  font-size: 24rpx;
+  position: absolute;
+  top: 16rpx;
+  right: 18rpx;
+  font-size: 20rpx;
   color: #1677ff;
 }
 
-.modal-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16rpx;
-  border-top: 1rpx solid #edf3f8;
+.picker-shell {
+  justify-content: space-between;
+  padding: 0 20rpx;
 }
 
-@media (max-width: 520px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
+.placeholder {
+  color: #9aaec4;
+}
+
+.modal-actions {
+  gap: 14rpx;
+  margin-top: 24rpx;
+}
+
+.modal-actions button {
+  flex: 1;
 }
 </style>

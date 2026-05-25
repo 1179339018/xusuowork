@@ -43,14 +43,6 @@
       </scroll-view>
     </view>
 
-    <view class="status-summary-card">
-      <view class="status-summary-main">
-        <text class="status-summary-title">当前视图</text>
-        <text class="status-summary-value">{{ currentStatusLabel }}</text>
-      </view>
-      <text class="status-summary-desc">{{ statusSummaryDesc }}</text>
-    </view>
-
     <scroll-view
       scroll-y
       class="list-container"
@@ -145,6 +137,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { getNavbarConfig } from '@/utils/navbar'
+import { callCloudFunction, settleTasks } from '@/utils/cloud'
 import {
   DISPUTE_STATUS,
   FILTER_ALL,
@@ -261,19 +254,6 @@ const statusTabs = computed(() => (
   }))
 ))
 
-const currentStatusLabel = computed(() => {
-  const hit = statusTabs.value.find((item) => item.value === currentStatus.value)
-  return hit?.label || currentStatus.value
-})
-
-const statusSummaryDesc = computed(() => {
-  if (currentStatus.value === FILTER_ALL) {
-    return '当前展示当前角色可见的全部任务，便于快速浏览整体进展。'
-  }
-
-  return `当前聚焦“${currentStatusLabel.value}”任务，适合集中处理同一阶段事项。`
-})
-
 const pageTitle = computed(() => {
   switch (userStore.role) {
     case USER_ROLES.POLICE:
@@ -352,14 +332,19 @@ const hydrateCache = () => {
   const statsKey = `task:stats:${userStore.role || 'guest'}:${userStore.openid || 'anonymous'}:${userStore.community || 'all'}`
   const cachedStats = getPageCache(statsKey, CACHE_AGE)
   const cachedList = getPageCache(buildKey('list'), CACHE_AGE)
+  let hasCache = false
 
   if (cachedStats) {
     statistics.value = { ...statistics.value, ...cachedStats }
+    hasCache = true
   }
 
   if (Array.isArray(cachedList)) {
     taskList.value = cachedList
+    hasCache = true
   }
+
+  return hasCache
 }
 
 const loadTaskCounts = async (force = false) => {
@@ -371,14 +356,11 @@ const loadTaskCounts = async (force = false) => {
     }
   }
 
-  const { result } = await uniCloud.callFunction({
-    name: 'getStatistics',
-    data: {
+  const { result } = await callCloudFunction('getStatistics', {
       role: userStore.role,
       openid: userStore.openid,
       community: userStore.community
-    }
-  })
+    }, { timeout: 8000 })
 
   if (!result?.success) {
     throw new Error(result?.error || '统计加载失败')
@@ -410,9 +392,7 @@ const loadList = async ({ force = false, reset = false } = {}) => {
 
   loading.value = true
   try {
-    const { result } = await uniCloud.callFunction({
-      name: 'getDisputeList',
-      data: {
+    const { result } = await callCloudFunction('getDisputeList', {
         role: userStore.role,
         openid: userStore.openid,
         community: userStore.community,
@@ -421,8 +401,7 @@ const loadList = async ({ force = false, reset = false } = {}) => {
         page: page.value,
         pageSize,
         needTotal: false
-      }
-    })
+      }, { timeout: 8000 })
 
     if (!result?.success) {
       throw new Error(result?.error || '任务加载失败')
@@ -443,7 +422,7 @@ const loadList = async ({ force = false, reset = false } = {}) => {
 const refresh = async () => {
   refreshing.value = true
   try {
-    await Promise.all([
+    await settleTasks([
       loadTaskCounts(true),
       loadList({ force: true, reset: true })
     ])
@@ -522,12 +501,16 @@ onMounted(async () => {
     return
   }
 
-  if (!availableStatuses.value.includes(currentStatus.value)) {
-    currentStatus.value = getDefaultStatus()
-  }
-
   initNavbar()
-  hydrateCache()
+  const hasCache = hydrateCache()
+
+  if (hasCache) {
+    hasInitialized.value = true
+    void refresh().catch((error) => {
+      console.error('任务页后台刷新失败', error)
+    })
+    return
+  }
 
   isInitializing.value = true
   try {
@@ -550,10 +533,6 @@ onShow(async () => {
   }
 
   initNavbar()
-  if (!availableStatuses.value.includes(currentStatus.value)) {
-    currentStatus.value = getDefaultStatus()
-  }
-
   if (isInitializing.value || !hasInitialized.value) {
     return
   }
@@ -574,14 +553,13 @@ onShow(async () => {
   padding: 20rpx;
   box-sizing: border-box;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 24%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), transparent 24%),
     linear-gradient(180deg, #deecff 0%, #f7faff 38%, #eef4ff 100%);
 }
 
 .hero-card,
-.tabs-card,
-.task-card,
-.stats-card {
+.stats-card,
+.task-card {
   background: rgba(255, 255, 255, 0.96);
   border-radius: 24rpx;
   border: 1rpx solid rgba(22, 119, 255, 0.08);
@@ -590,235 +568,234 @@ onShow(async () => {
 
 .hero-card {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: 18rpx;
+  gap: 24rpx;
   padding: 28rpx;
   margin-bottom: 18rpx;
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
 }
 
-.action-strip {
-  display: flex;
-  gap: 14rpx;
-  margin-bottom: 18rpx;
-}
-
-.action-btn {
-  flex: 1;
+.hero-title,
+.hero-desc,
+.hero-badge {
+  color: #fff;
 }
 
 .hero-title {
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #1f3150;
-  margin-bottom: 8rpx;
 }
 
 .hero-desc {
   display: block;
+  margin-top: 8rpx;
   font-size: 24rpx;
-  line-height: 1.6;
-  color: #6f839d;
+  line-height: 1.7;
+  opacity: 0.88;
 }
 
 .hero-badge {
-  flex-shrink: 0;
-  min-width: 136rpx;
-  padding: 10rpx 18rpx;
+  align-self: flex-start;
+  padding: 10rpx 16rpx;
   border-radius: 999rpx;
-  text-align: center;
-  background: #edf4ff;
-  color: #145bd7;
+  background: rgba(255, 255, 255, 0.18);
   font-size: 24rpx;
-  font-weight: 600;
+}
+
+.action-strip {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 18rpx;
+}
+
+.action-btn,
+.btn-primary,
+.btn-secondary,
+.empty-btn {
+  height: 78rpx;
+  line-height: 78rpx;
+  border-radius: 18rpx;
+  font-size: 26rpx;
+}
+
+.action-btn {
+  flex: 1;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #f7faff;
+  color: #305172;
+}
+
+.btn-primary::after,
+.btn-secondary::after {
+  border: none;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14rpx;
   margin-bottom: 18rpx;
 }
 
 .stats-card {
-  padding: 24rpx 18rpx;
-  text-align: center;
+  padding: 22rpx 18rpx;
 }
 
-.stats-card.warning .stats-value {
-  color: #fa8c16;
-}
-
-.stats-card.success .stats-value {
-  color: #52c41a;
+.stats-card.warning {
+  background: linear-gradient(180deg, rgba(255, 247, 230, 0.98), rgba(255, 255, 255, 0.96));
 }
 
 .stats-card.accent {
-  background: linear-gradient(135deg, rgba(20, 91, 215, 0.96) 0%, rgba(79, 149, 255, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(237, 244, 255, 0.98), rgba(255, 255, 255, 0.96));
 }
 
-.stats-card.accent .stats-label,
-.stats-card.accent .stats-value {
-  color: #fff;
+.stats-card.success {
+  background: linear-gradient(180deg, rgba(240, 255, 244, 0.98), rgba(255, 255, 255, 0.96));
 }
 
 .stats-label {
   display: block;
-  font-size: 23rpx;
-  color: #7587a0;
-  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  color: #7790aa;
 }
 
 .stats-value {
   display: block;
-  font-size: 42rpx;
-  line-height: 1.1;
+  margin-top: 10rpx;
+  font-size: 36rpx;
   font-weight: 700;
-  color: #163052;
+  color: #223754;
 }
 
 .tabs-card {
-  padding: 14rpx 0;
   margin-bottom: 18rpx;
 }
 
-.status-summary-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-  padding: 20rpx 22rpx;
-  margin-bottom: 18rpx;
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1rpx solid rgba(22, 119, 255, 0.08);
-}
-
-.status-summary-main {
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.status-summary-title {
-  font-size: 22rpx;
-  color: #7b8ea6;
-}
-
-.status-summary-value {
-  font-size: 30rpx;
-  color: #1f3150;
-  font-weight: 700;
-}
-
-.status-summary-desc {
-  flex: 1;
-  text-align: right;
-  font-size: 22rpx;
-  line-height: 1.6;
-  color: #7b8ea6;
+.tabs-card {
+  padding: 4rpx 0 2rpx;
+  overflow: hidden;
 }
 
 .tabs-wrap {
-  display: flex;
+  display: inline-flex;
   gap: 12rpx;
-  padding: 0 18rpx;
+  padding: 0 2rpx 4rpx;
 }
 
 .tab-item {
-  padding: 14rpx 24rpx;
-  border-radius: 999rpx;
-  background: #f4f8ff;
-  color: #5d7390;
-  font-size: 25rpx;
-  white-space: nowrap;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
+  min-height: 58rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  color: #496682;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1rpx solid rgba(91, 124, 160, 0.14);
+  font-size: 24rpx;
+  box-shadow: 0 6rpx 16rpx rgba(30, 76, 128, 0.05);
 }
 
 .tab-item.active {
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
-}
-
-.tab-item.active .tab-label,
-.tab-item.active .tab-badge {
   color: #fff;
-}
-
-.tab-item.active .tab-badge {
-  background: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  border-color: transparent;
+  box-shadow: 0 10rpx 22rpx rgba(22, 119, 255, 0.22);
 }
 
 .tab-badge {
-  min-width: 32rpx;
-  height: 32rpx;
-  padding: 0 10rpx;
+  min-width: 30rpx;
+  padding: 2rpx 9rpx;
   border-radius: 999rpx;
-  background: #e6eef8;
+  background: rgba(22, 119, 255, 0.1);
+  color: #1677ff;
+  text-align: center;
   font-size: 20rpx;
-  color: #48617f;
-  display: inline-flex;
+}
+
+.tab-item.active .tab-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.task-top,
+.title-wrap,
+.task-footer,
+.time-chip {
+  display: flex;
   align-items: center;
-  justify-content: center;
+}
+
+.task-top,
+.task-footer {
+  justify-content: space-between;
 }
 
 .list-container {
   flex: 1;
-  height: 0;
+  min-height: 0;
 }
 
 .task-card {
-  padding: 26rpx;
-  margin-bottom: 18rpx;
-}
-
-.task-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 14rpx;
-  margin-bottom: 18rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
 }
 
 .title-wrap {
+  gap: 12rpx;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
+  flex: 1;
 }
 
 .task-title {
-  font-size: 29rpx;
+  font-size: 30rpx;
   font-weight: 700;
-  color: #1f3150;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #223754;
 }
 
-.status-chip,
-.urgency-chip {
-  flex-shrink: 0;
-  padding: 6rpx 14rpx;
+.urgency-chip,
+.status-chip {
+  padding: 8rpx 14rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  font-weight: 600;
+}
+
+.tag-primary {
+  background: #edf4ff;
+  color: #1677ff;
+}
+
+.tag-warning {
+  background: #fff4de;
+  color: #d48806;
+}
+
+.tag-danger {
+  background: #fff0f0;
+  color: #cf1322;
 }
 
 .status-pending {
   background: #fff7e6;
-  color: #fa8c16;
+  color: #d48806;
 }
 
 .status-processing {
-  background: #e6f4ff;
+  background: #edf4ff;
   color: #1677ff;
 }
 
 .status-resolved {
   background: #f6ffed;
-  color: #52c41a;
+  color: #389e0d;
 }
 
 .status-closed {
@@ -826,70 +803,43 @@ onShow(async () => {
   color: #8c8c8c;
 }
 
-.tag-primary {
-  background: #e6f4ff;
-  color: #1677ff;
-}
-
-.tag-warning {
-  background: #fff7e6;
-  color: #fa8c16;
-}
-
-.tag-danger {
-  background: #fff1f0;
-  color: #ff4d4f;
-}
-
 .task-body {
-  background: #f7faff;
-  border-radius: 18rpx;
-  padding: 20rpx;
+  margin-top: 18rpx;
+  display: grid;
+  gap: 12rpx;
 }
 
 .info-row {
   display: flex;
-  gap: 18rpx;
-  margin-bottom: 12rpx;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
+  justify-content: space-between;
+  gap: 12rpx;
 }
 
 .info-label {
   width: 96rpx;
-  flex-shrink: 0;
   font-size: 24rpx;
-  color: #7c8fa7;
+  color: #7b91aa;
 }
 
 .info-value {
   flex: 1;
-  font-size: 25rpx;
-  color: #24364f;
+  text-align: right;
+  font-size: 24rpx;
+  color: #223754;
 }
 
-.location {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.info-value.location {
+  max-width: 420rpx;
 }
 
 .task-footer {
-  margin-top: 18rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16rpx;
+  margin-top: 20rpx;
 }
 
 .time-chip {
-  display: inline-flex;
-  align-items: center;
   gap: 10rpx;
-  color: #7b8ea6;
   font-size: 23rpx;
+  color: #6f85a0;
 }
 
 .time-dot {
@@ -899,91 +849,52 @@ onShow(async () => {
   background: #1677ff;
 }
 
-.btn-primary,
-.btn-secondary {
-  min-width: 176rpx;
-  height: 72rpx;
-  line-height: 72rpx;
-  border-radius: 18rpx;
-  font-size: 24rpx;
-  font-weight: 600;
-}
-
-.btn-primary::after,
-.btn-secondary::after {
-  border: none;
-}
-
-.btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #145bd7 0%, #4f95ff 100%);
-}
-
-.btn-secondary {
-  color: #35506f;
-  background: #eef4ff;
+.state-text,
+.empty-text,
+.empty-desc {
+  text-align: center;
 }
 
 .state-text {
-  text-align: center;
+  padding: 24rpx 0 36rpx;
   font-size: 24rpx;
-  color: #7c8fa7;
-  padding: 24rpx 0 40rpx;
+  color: #6f85a0;
 }
 
 .empty-state {
-  padding: 90rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  padding: 80rpx 24rpx 60rpx;
 }
 
 .empty-mark {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(135deg, #d6e7ff 0%, #eef5ff 100%);
-  margin-bottom: 18rpx;
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 20rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #edf4ff 0%, #f8fbff 100%);
 }
 
 .empty-text {
-  font-size: 28rpx;
-  color: #70839b;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #223754;
 }
 
 .empty-desc {
-  margin-top: 10rpx;
-  font-size: 23rpx;
-  line-height: 1.6;
-  color: #91a2b7;
-  text-align: center;
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #7790aa;
 }
 
 .empty-actions {
   display: flex;
   gap: 14rpx;
-  margin-top: 22rpx;
+  margin-top: 26rpx;
 }
 
 .empty-btn {
-  min-width: 170rpx;
-}
-
-@media (max-width: 520px) {
-  .action-strip,
-  .status-summary-card,
-  .empty-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .status-summary-desc {
-    text-align: left;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
+  flex: 1;
 }
 </style>

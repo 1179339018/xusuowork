@@ -299,6 +299,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { getNavbarConfig } from '@/utils/navbar'
+import { callCloudFunction } from '@/utils/cloud'
 import { DISPUTE_STATUS, STATUS_CLASS_MAP, URGENCY_TAG_CLASS_MAP } from '@/utils/constants'
 import { clearPageCacheByPrefix, getPageCache, getPageCacheDirtyAt, setPageCache } from '@/utils/page-cache'
 
@@ -414,10 +415,9 @@ const resetFeedbackForm = () => {
 const loadDetail = async () => {
   loading.value = true
   try {
-    const res = await uniCloud.callFunction({
-      name: 'getDisputeDetail',
-      data: { disputeId: disputeId.value }
-    })
+    const res = await callCloudFunction('getDisputeDetail', {
+      disputeId: disputeId.value
+    }, { timeout: 8000 })
 
     if (!res.result?.success) {
       throw new Error(res.result?.error || '加载失败')
@@ -505,9 +505,7 @@ const submitFeedback = async () => {
 
   submitting.value = true
   try {
-    const res = await uniCloud.callFunction({
-      name: 'submitFeedback',
-      data: {
+    const res = await callCloudFunction('submitFeedback', {
         disputeId: disputeId.value,
         feedbackData: {
           type: feedbackForm.type,
@@ -521,8 +519,7 @@ const submitFeedback = async () => {
           openid: userStore.openid,
           name: userStore.name
         }
-      }
-    })
+      }, { timeout: 10000 })
 
     if (!res.result?.success) {
       throw new Error(res.result?.error || '提交失败')
